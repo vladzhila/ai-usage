@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=360" />
+    <title>AI Usage Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1 class="title">AI USAGE</h1>
+        <button class="refresh-btn" id="refreshBtn" title="Refresh data">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 12a9 9 0 11-2.636-6.364" />
+            <path d="M21 3v6h-6" />
+          </svg>
+        </button>
+      </header>
+
+      <main class="services" id="services">
+        <!-- ChatGPT Card -->
+        <article class="card" data-service="chatgpt">
+          <div class="card-header">
+            <span class="service-name">ChatGPT</span>
+            <span class="status-dot" data-status="ok"></span>
+          </div>
+          <div class="session-row">
+            <span class="label">SESSION</span>
+            <span class="value"
+              ><span class="count" data-field="session-count">0</span>/<span
+                data-field="session-limit"
+                >150</span
+              ></span
+            >
+            <span class="timer">resets <span data-field="reset-time">--</span></span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" data-field="progress" style="width: 0%"></div>
+          </div>
+          <div class="weekly-row">
+            <span class="label">WEEKLY</span>
+            <span class="value"><span data-field="weekly-count">0</span></span>
+          </div>
+        </article>
+
+        <!-- Claude Card -->
+        <article class="card" data-service="claude">
+          <div class="card-header">
+            <span class="service-name">Claude</span>
+            <span class="status-dot" data-status="ok"></span>
+          </div>
+          <div class="session-row">
+            <span class="label">SESSION</span>
+            <span class="value"
+              ><span class="count" data-field="session-count">0</span>/<span
+                data-field="session-limit"
+                >45</span
+              ></span
+            >
+            <span class="timer">resets <span data-field="reset-time">--</span></span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" data-field="progress" style="width: 0%"></div>
+          </div>
+          <div class="weekly-row">
+            <span class="label">WEEKLY</span>
+            <span class="value"><span data-field="weekly-count">0</span></span>
+          </div>
+        </article>
+
+        <!-- OpenAI API Card -->
+        <article class="card card-api" data-service="openaiApi">
+          <div class="card-header">
+            <span class="service-name">OpenAI API</span>
+            <span class="status-dot" data-status="ok"></span>
+          </div>
+          <div class="api-row">
+            <span class="label">THIS MONTH</span>
+            <span class="value spend">$<span data-field="spend">0.00</span></span>
+          </div>
+          <div class="updated-row">
+            <span class="updated" data-field="updated">never</span>
+            <a
+              href="https://platform.openai.com/usage"
+              target="_blank"
+              class="dashboard-link"
+              title="Open dashboard"
+              >↗</a
+            >
+          </div>
+        </article>
+
+        <!-- Anthropic API Card -->
+        <article class="card card-api" data-service="anthropicApi">
+          <div class="card-header">
+            <span class="service-name">Anthropic API</span>
+            <span class="status-dot" data-status="ok"></span>
+          </div>
+          <div class="api-row">
+            <span class="label">THIS MONTH</span>
+            <span class="value spend">$<span data-field="spend">0.00</span></span>
+          </div>
+          <div class="updated-row">
+            <span class="updated" data-field="updated">never</span>
+            <a
+              href="https://console.anthropic.com/settings/billing"
+              target="_blank"
+              class="dashboard-link"
+              title="Open dashboard"
+              >↗</a
+            >
+          </div>
+        </article>
+      </main>
+
+      <div class="scanlines"></div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

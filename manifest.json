@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "AI Usage Tracker",
+  "version": "1.0.0",
+  "description": "Track ChatGPT, Claude, OpenAI API, and Anthropic API usage in one place",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://platform.openai.com/*",
+    "https://console.anthropic.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
+      "js": ["content-scripts/chatgpt.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content-scripts/claude.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://platform.openai.com/*"],
+      "js": ["content-scripts/openai-dashboard.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://console.anthropic.com/*"],
+      "js": ["content-scripts/anthropic-dashboard.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

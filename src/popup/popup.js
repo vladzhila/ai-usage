@@ -183,7 +183,7 @@ function updateCard(service, result) {
 
     setField(card, 'weekly-used', weekly.used || 0)
     updateBar(card, 'weekly-bar', weekly.used || 0)
-    setField(card, 'weekly-reset', formatResetDate(weekly.reset))
+    setField(card, 'weekly-reset', formatWeeklyReset(weekly.reset))
     return
   }
 
@@ -198,14 +198,16 @@ function updateCard(service, result) {
   setField(card, 'reset', formatReset(data.reset))
 }
 
+const MS_PER_SECOND = 1000
 const MS_PER_MINUTE = 60000
 const MS_PER_HOUR = 3600000
-const MS_PER_DAY = 86400000
+const MS_TIMESTAMP_THRESHOLD = 1000000000000
 const SPIN_DELAY_MS = 300
 const MAX_PERCENT = 100
 const NOTICE_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.'
 const ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
 const NOTICE_ID = 'notice'
+const TIME_SEPARATOR = ':'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // Format reset time as relative (Xh Xm)
@@ -229,24 +231,30 @@ function formatReset(timestamp) {
   return `${mins}m`
 }
 
-// Format reset time as date (Jan 20) or relative if within 24h
-function formatResetDate(timestamp) {
+function padTime(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatWeeklyReset(timestamp) {
   if (!timestamp) {
     return '--'
   }
 
-  const reset = new Date(timestamp)
-  const diff = reset - new Date()
+  const ms = timestamp < MS_TIMESTAMP_THRESHOLD ? timestamp * MS_PER_SECOND : timestamp
+  const reset = new Date(ms)
 
-  if (diff <= 0) {
-    return 'now'
+  if (Number.isNaN(reset.getTime())) {
+    return '--'
   }
 
-  if (diff < MS_PER_DAY) {
-    return formatReset(timestamp)
-  }
+  const day = reset.getDate()
+  const year = reset.getFullYear()
+  const hours24 = reset.getHours()
+  const hours12 = hours24 % 12 || 12
+  const suffix = hours24 >= 12 ? 'PM' : 'AM'
+  const minutes = padTime(reset.getMinutes())
 
-  return `${MONTHS[reset.getMonth()]} ${reset.getDate()}`
+  return `${MONTHS[reset.getMonth()]} ${day}, ${year} ${hours12}${TIME_SEPARATOR}${minutes} ${suffix}`
 }
 
 function setNotice(message) {

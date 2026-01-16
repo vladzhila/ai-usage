@@ -1,111 +1,50 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: '*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json'
-alwaysApply: false
----
+# Project
 
-Default to using Bun instead of Node.js.
+Chrome extension (Manifest v3) tracking AI service usage limits for Claude, ChatGPT/Codex, and Cursor.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Bun automatically loads .env, so don't use dotenv.
+# Commands
 
-## APIs
-
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
-
-## Testing
-
-Use `bun test` to run tests.
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+```bash
+bun run dev          # Build + watch mode
+bun run build        # Production build to dist/
+bun test             # Run all tests
+bun test <file>      # Run single test file
+bun test --coverage  # Test with coverage
+bun run lint         # ESLint check
+bun run lint:fix     # ESLint autofix
+bun run format       # Prettier format all
 ```
 
-## Frontend
+# Architecture
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+**Message Flow**: Popup → `chrome.runtime.sendMessage` → Service Worker → fetch APIs → cache + respond
 
-Server:
+**Key Files**:
 
-```ts#index.ts
-import index from "./index.html"
+- `src/background/service-worker.js` - Fetches usage from claude.ai, chatgpt.com, cursor.com APIs
+- `src/popup/popup.js` - UI logic, sends `FETCH_USAGE` messages to background
+- `src/lib/constants.js` - Time windows (Claude 5h/ChatGPT 3h), limits, storage keys
+- `src/lib/storage.js` - Chrome storage wrapper with 1-minute cache TTL
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
+**Providers**: Each has session windows, limits, and API-specific fetch logic. Data cached with fallback on fetch failure.
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+# Development
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+- After making changes, always add/update tests if applicable and run `bun test` to ensure all tests pass.
+- Use `code-simplifier:code-simplifier` subagent to refactor code.
 
-With the following `frontend.tsx`:
+# Testing
 
-```tsx#frontend.tsx
-import React from "react";
+Tests in `tests/` use `bun:test`. Chrome APIs mocked in `tests/mocks/chrome.js`.
 
-// import .css files directly and it works
-import './index.css';
+# Pre-commit Hook
 
-import { createRoot } from "react-dom/client";
+1. `bunx lint-staged` - Prettier formats staged files
+2. `bun run lint` - ESLint checks all src/
+3. `bun test` - Runs test suite
 
-const root = createRoot(document.body);
+All must pass to commit. Configured in `.husky/pre-commit` and `package.json`.
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
+# Bun
 
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+Use Bun for all tooling. Avoid npm/vite/webpack. Use `bun install`, `bun test`, `bun run <script>`.

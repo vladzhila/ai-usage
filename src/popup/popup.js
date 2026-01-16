@@ -1,16 +1,12 @@
 // Popup script - fetches and displays usage data
 
+import { formatReset, formatWeeklyReset, getUsagePercent } from '../lib/format.js'
+import { SERVICES, parseVisibility, isAllHidden } from '../lib/visibility.js'
+
 // Theme constants
 const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
-
-// Visibility config
-const SERVICES = [
-  { key: 'showClaude', id: 'show-claude', name: 'claude' },
-  { key: 'showCodex', id: 'show-codex', name: 'codex' },
-  { key: 'showCursor', id: 'show-cursor', name: 'cursor' },
-]
 
 // Get stored theme
 function getTheme() {
@@ -49,11 +45,7 @@ function getVisibility() {
   const keys = SERVICES.map((s) => s.key)
   return new Promise((resolve) => {
     chrome.storage.local.get(keys, (result) => {
-      const visibility = {}
-      for (const s of SERVICES) {
-        visibility[s.name] = result[s.key] !== false
-      }
-      resolve(visibility)
+      resolve(parseVisibility(result))
     })
   })
 }
@@ -89,9 +81,8 @@ function applyVisibility(visibility) {
     cursorCard.classList.toggle('hidden', !visibility.cursor)
   }
 
-  const allHidden = !visibility.claude && !visibility.codex && !visibility.cursor
   if (empty) {
-    empty.classList.toggle('hidden', !allHidden)
+    empty.classList.toggle('hidden', !isAllHidden(visibility))
   }
 }
 
@@ -159,15 +150,6 @@ function setField(card, field, value) {
   }
 }
 
-function getUsagePercent(used, limit) {
-  if (limit <= 0) {
-    return 0
-  }
-  const ratio = used / limit
-  const percent = Math.round(ratio * MAX_PERCENT)
-  return Math.min(MAX_PERCENT, percent)
-}
-
 // Update card with data
 function updateCard(service, result) {
   const card = document.querySelector(`[data-service="${service}"]`)
@@ -221,64 +203,10 @@ function updateCard(service, result) {
   setField(card, 'reset', formatReset(data.reset))
 }
 
-const MS_PER_SECOND = 1000
-const MS_PER_MINUTE = 60000
-const MS_PER_HOUR = 3600000
-const MS_TIMESTAMP_THRESHOLD = 1000000000000
 const SPIN_DELAY_MS = 300
-const MAX_PERCENT = 100
 const NOTICE_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.'
 const ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
 const NOTICE_ID = 'notice'
-const TIME_SEPARATOR = ':'
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// Format reset time as relative (Xh Xm)
-function formatReset(timestamp) {
-  if (!timestamp) {
-    return '--'
-  }
-
-  const diff = new Date(timestamp) - new Date()
-
-  if (diff <= 0) {
-    return 'now'
-  }
-
-  const hours = Math.floor(diff / MS_PER_HOUR)
-  const mins = Math.floor((diff % MS_PER_HOUR) / MS_PER_MINUTE)
-
-  if (hours > 0) {
-    return `${hours}h ${mins}m`
-  }
-  return `${mins}m`
-}
-
-function padTime(value) {
-  return String(value).padStart(2, '0')
-}
-
-function formatWeeklyReset(timestamp) {
-  if (!timestamp) {
-    return '--'
-  }
-
-  const ms = timestamp < MS_TIMESTAMP_THRESHOLD ? timestamp * MS_PER_SECOND : timestamp
-  const reset = new Date(ms)
-
-  if (Number.isNaN(reset.getTime())) {
-    return '--'
-  }
-
-  const day = reset.getDate()
-  const year = reset.getFullYear()
-  const hours24 = reset.getHours()
-  const hours12 = hours24 % 12 || 12
-  const suffix = hours24 >= 12 ? 'PM' : 'AM'
-  const minutes = padTime(reset.getMinutes())
-
-  return `${MONTHS[reset.getMonth()]} ${day}, ${year} ${hours12}${TIME_SEPARATOR}${minutes} ${suffix}`
-}
 
 function setNotice(message) {
   const notice = document.getElementById(NOTICE_ID)

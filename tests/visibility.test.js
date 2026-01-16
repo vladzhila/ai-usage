@@ -1,84 +1,98 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { createChromeMock, clearMocks } from './mocks/chrome.js'
+import { parseVisibility, isAllHidden, SERVICES } from '../src/lib/visibility.js'
 
 // Setup global chrome mock
 const chrome = createChromeMock()
 globalThis.chrome = chrome
 
-// Visibility keys
-const SHOW_CLAUDE_KEY = 'showClaude'
-const SHOW_CODEX_KEY = 'showCodex'
-
-// Test getVisibility logic (duplicated from popup.js for testing)
-function getVisibility(result) {
-  return {
-    claude: result[SHOW_CLAUDE_KEY] !== false,
-    codex: result[SHOW_CODEX_KEY] !== false,
-  }
-}
-
-// Test applyVisibility logic
-function getEmptyState(visibility) {
-  return !visibility.claude && !visibility.codex
-}
-
-describe('Visibility - getVisibility', () => {
-  beforeEach(() => {
-    clearMocks()
-  })
-
-  test('defaults both to true when not set', () => {
-    const visibility = getVisibility({})
+describe('Visibility - parseVisibility', () => {
+  test('defaults all to true when not set', () => {
+    const visibility = parseVisibility({})
     expect(visibility.claude).toBe(true)
     expect(visibility.codex).toBe(true)
+    expect(visibility.cursor).toBe(true)
   })
 
   test('respects showClaude: false', () => {
-    const visibility = getVisibility({ [SHOW_CLAUDE_KEY]: false })
+    const visibility = parseVisibility({ showClaude: false })
     expect(visibility.claude).toBe(false)
     expect(visibility.codex).toBe(true)
+    expect(visibility.cursor).toBe(true)
   })
 
   test('respects showCodex: false', () => {
-    const visibility = getVisibility({ [SHOW_CODEX_KEY]: false })
+    const visibility = parseVisibility({ showCodex: false })
     expect(visibility.claude).toBe(true)
     expect(visibility.codex).toBe(false)
+    expect(visibility.cursor).toBe(true)
   })
 
-  test('respects both hidden', () => {
-    const visibility = getVisibility({
-      [SHOW_CLAUDE_KEY]: false,
-      [SHOW_CODEX_KEY]: false,
+  test('respects showCursor: false', () => {
+    const visibility = parseVisibility({ showCursor: false })
+    expect(visibility.claude).toBe(true)
+    expect(visibility.codex).toBe(true)
+    expect(visibility.cursor).toBe(false)
+  })
+
+  test('respects all hidden', () => {
+    const visibility = parseVisibility({
+      showClaude: false,
+      showCodex: false,
+      showCursor: false,
     })
     expect(visibility.claude).toBe(false)
     expect(visibility.codex).toBe(false)
+    expect(visibility.cursor).toBe(false)
   })
 
   test('treats explicit true correctly', () => {
-    const visibility = getVisibility({
-      [SHOW_CLAUDE_KEY]: true,
-      [SHOW_CODEX_KEY]: true,
+    const visibility = parseVisibility({
+      showClaude: true,
+      showCodex: true,
+      showCursor: true,
     })
     expect(visibility.claude).toBe(true)
     expect(visibility.codex).toBe(true)
+    expect(visibility.cursor).toBe(true)
   })
 })
 
-describe('Visibility - empty state', () => {
-  test('shows empty when both hidden', () => {
-    expect(getEmptyState({ claude: false, codex: false })).toBe(true)
+describe('Visibility - isAllHidden', () => {
+  test('returns true when all hidden', () => {
+    expect(isAllHidden({ claude: false, codex: false, cursor: false })).toBe(true)
   })
 
-  test('hides empty when claude visible', () => {
-    expect(getEmptyState({ claude: true, codex: false })).toBe(false)
+  test('returns false when claude visible', () => {
+    expect(isAllHidden({ claude: true, codex: false, cursor: false })).toBe(false)
   })
 
-  test('hides empty when codex visible', () => {
-    expect(getEmptyState({ claude: false, codex: true })).toBe(false)
+  test('returns false when codex visible', () => {
+    expect(isAllHidden({ claude: false, codex: true, cursor: false })).toBe(false)
   })
 
-  test('hides empty when both visible', () => {
-    expect(getEmptyState({ claude: true, codex: true })).toBe(false)
+  test('returns false when cursor visible', () => {
+    expect(isAllHidden({ claude: false, codex: false, cursor: true })).toBe(false)
+  })
+
+  test('returns false when all visible', () => {
+    expect(isAllHidden({ claude: true, codex: true, cursor: true })).toBe(false)
+  })
+})
+
+describe('Visibility - SERVICES config', () => {
+  test('has correct service keys', () => {
+    const keys = SERVICES.map((s) => s.key)
+    expect(keys).toContain('showClaude')
+    expect(keys).toContain('showCodex')
+    expect(keys).toContain('showCursor')
+  })
+
+  test('has correct service names', () => {
+    const names = SERVICES.map((s) => s.name)
+    expect(names).toContain('claude')
+    expect(names).toContain('codex')
+    expect(names).toContain('cursor')
   })
 })
 
@@ -88,38 +102,22 @@ describe('Visibility - storage persistence', () => {
   })
 
   test('persists showClaude setting', async () => {
-    await chrome.storage.local.set({ [SHOW_CLAUDE_KEY]: false })
-    const result = await chrome.storage.local.get(SHOW_CLAUDE_KEY)
-    expect(result[SHOW_CLAUDE_KEY]).toBe(false)
+    await chrome.storage.local.set({ showClaude: false })
+    const result = await chrome.storage.local.get('showClaude')
+    expect(result.showClaude).toBe(false)
   })
 
   test('persists showCodex setting', async () => {
-    await chrome.storage.local.set({ [SHOW_CODEX_KEY]: false })
-    const result = await chrome.storage.local.get(SHOW_CODEX_KEY)
-    expect(result[SHOW_CODEX_KEY]).toBe(false)
+    await chrome.storage.local.set({ showCodex: false })
+    const result = await chrome.storage.local.get('showCodex')
+    expect(result.showCodex).toBe(false)
   })
 
   test('retrieves multiple settings', async () => {
-    await chrome.storage.local.set({ [SHOW_CLAUDE_KEY]: false })
-    await chrome.storage.local.set({ [SHOW_CODEX_KEY]: true })
-    const result = await chrome.storage.local.get([SHOW_CLAUDE_KEY, SHOW_CODEX_KEY])
-    expect(result[SHOW_CLAUDE_KEY]).toBe(false)
-    expect(result[SHOW_CODEX_KEY]).toBe(true)
-  })
-})
-
-describe('Visibility - hidden status', () => {
-  const HIDDEN_RESULT = { status: 'hidden' }
-
-  test('hidden provider returns hidden status', () => {
-    expect(HIDDEN_RESULT.status).toBe('hidden')
-  })
-
-  test('hidden status should not be processed as card update', () => {
-    // When a provider returns { status: 'hidden' }, the popup should not call updateCard
-    const result = { status: 'hidden' }
-    expect(result.status).not.toBe('ok')
-    expect(result.status).not.toBe('error')
-    expect(result.status).not.toBe('logged_out')
+    await chrome.storage.local.set({ showClaude: false })
+    await chrome.storage.local.set({ showCodex: true })
+    const result = await chrome.storage.local.get(['showClaude', 'showCodex'])
+    expect(result.showClaude).toBe(false)
+    expect(result.showCodex).toBe(true)
   })
 })

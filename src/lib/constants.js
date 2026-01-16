@@ -1,7 +1,18 @@
-// Session window durations in milliseconds
-export const CHATGPT_SESSION_WINDOW_MS = 3 * 60 * 60 * 1000 // 3 hours
-export const CLAUDE_SESSION_WINDOW_MS = 5 * 60 * 60 * 1000 // 5 hours
-export const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+// Time constants
+export const MS_PER_MINUTE = 60 * 1000
+export const MS_PER_HOUR = 60 * MS_PER_MINUTE
+export const MS_PER_DAY = 24 * MS_PER_HOUR
+
+// Session window durations
+export const CHATGPT_SESSION_WINDOW_MS = 3 * MS_PER_HOUR
+export const CLAUDE_SESSION_WINDOW_MS = 5 * MS_PER_HOUR
+export const WEEK_MS = 7 * MS_PER_DAY
+
+// Window lookup by service
+export const SESSION_WINDOW_MS = {
+  chatgpt: CHATGPT_SESSION_WINDOW_MS,
+  claude: CLAUDE_SESSION_WINDOW_MS,
+}
 
 // Default limits (ChatGPT Plus / Claude Pro)
 export const CHATGPT_SESSION_LIMIT = 150

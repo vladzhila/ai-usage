@@ -5,10 +5,12 @@ const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
 
-// Visibility constants
-const SHOW_CLAUDE_KEY = 'showClaude'
-const SHOW_CODEX_KEY = 'showCodex'
-const SHOW_CURSOR_KEY = 'showCursor'
+// Visibility config
+const SERVICES = [
+  { key: 'showClaude', id: 'show-claude', name: 'claude' },
+  { key: 'showCodex', id: 'show-codex', name: 'codex' },
+  { key: 'showCursor', id: 'show-cursor', name: 'cursor' },
+]
 
 // Get stored theme
 function getTheme() {
@@ -44,13 +46,14 @@ async function initTheme() {
 
 // Get visibility settings from storage
 function getVisibility() {
+  const keys = SERVICES.map((s) => s.key)
   return new Promise((resolve) => {
-    chrome.storage.local.get([SHOW_CLAUDE_KEY, SHOW_CODEX_KEY, SHOW_CURSOR_KEY], (result) => {
-      resolve({
-        claude: result[SHOW_CLAUDE_KEY] !== false,
-        codex: result[SHOW_CODEX_KEY] !== false,
-        cursor: result[SHOW_CURSOR_KEY] !== false,
-      })
+    chrome.storage.local.get(keys, (result) => {
+      const visibility = {}
+      for (const s of SERVICES) {
+        visibility[s.name] = result[s.key] !== false
+      }
+      resolve(visibility)
     })
   })
 }
@@ -58,6 +61,15 @@ function getVisibility() {
 // Save visibility setting
 function setVisibility(key, value) {
   chrome.storage.local.set({ [key]: value })
+}
+
+// Run callback for each visible service
+function forEachVisible(visibility, callback) {
+  for (const s of SERVICES) {
+    if (visibility[s.name]) {
+      callback(s.name)
+    }
+  }
 }
 
 // Apply visibility to cards and empty state
@@ -302,15 +314,7 @@ async function fetchData(force = false) {
   const visibility = await getVisibility()
 
   // Show loading only for visible providers
-  if (visibility.claude) {
-    showState('claude', 'loading')
-  }
-  if (visibility.codex) {
-    showState('codex', 'loading')
-  }
-  if (visibility.cursor) {
-    showState('cursor', 'loading')
-  }
+  forEachVisible(visibility, (name) => showState(name, 'loading'))
 
   chrome.runtime
     .sendMessage({ type: 'FETCH_USAGE', force, visibility })
@@ -333,15 +337,7 @@ async function fetchData(force = false) {
       setNotice('')
     })
     .catch(() => {
-      if (visibility.claude) {
-        setError('claude', ERROR_MESSAGE)
-      }
-      if (visibility.codex) {
-        setError('codex', ERROR_MESSAGE)
-      }
-      if (visibility.cursor) {
-        setError('cursor', ERROR_MESSAGE)
-      }
+      forEachVisible(visibility, (name) => setError(name, ERROR_MESSAGE))
       setNotice('')
     })
     .finally(() => {
@@ -352,57 +348,35 @@ async function fetchData(force = false) {
 // Initialize visibility settings
 async function initVisibility() {
   const visibility = await getVisibility()
-  const claudeCheckbox = document.getElementById('show-claude')
-  const codexCheckbox = document.getElementById('show-codex')
-  const cursorCheckbox = document.getElementById('show-cursor')
+  const checkboxes = {}
 
-  // Set checkbox states
-  claudeCheckbox.checked = visibility.claude
-  codexCheckbox.checked = visibility.codex
-  cursorCheckbox.checked = visibility.cursor
+  // Set checkbox states and build lookup
+  for (const s of SERVICES) {
+    const checkbox = document.getElementById(s.id)
+    checkboxes[s.name] = checkbox
+    checkbox.checked = visibility[s.name]
+  }
 
   // Apply visibility to cards
   applyVisibility(visibility)
 
   // Wire up checkbox handlers
-  claudeCheckbox.addEventListener('change', (e) => {
-    const checked = e.target.checked
-    setVisibility(SHOW_CLAUDE_KEY, checked)
-    applyVisibility({
-      claude: checked,
-      codex: codexCheckbox.checked,
-      cursor: cursorCheckbox.checked,
-    })
-    if (checked) {
-      fetchData()
-    }
-  })
+  for (const s of SERVICES) {
+    checkboxes[s.name].addEventListener('change', (e) => {
+      const checked = e.target.checked
+      setVisibility(s.key, checked)
 
-  codexCheckbox.addEventListener('change', (e) => {
-    const checked = e.target.checked
-    setVisibility(SHOW_CODEX_KEY, checked)
-    applyVisibility({
-      claude: claudeCheckbox.checked,
-      codex: checked,
-      cursor: cursorCheckbox.checked,
-    })
-    if (checked) {
-      fetchData()
-    }
-  })
+      const updated = {}
+      for (const svc of SERVICES) {
+        updated[svc.name] = svc.name === s.name ? checked : checkboxes[svc.name].checked
+      }
+      applyVisibility(updated)
 
-  cursorCheckbox.addEventListener('change', (e) => {
-    const checked = e.target.checked
-    setVisibility(SHOW_CURSOR_KEY, checked)
-    applyVisibility({
-      claude: claudeCheckbox.checked,
-      codex: codexCheckbox.checked,
-      cursor: checked,
+      if (checked) {
+        fetchData()
+      }
     })
-    if (checked) {
-      fetchData()
-    }
-  })
+  }
 }
 
 // Init

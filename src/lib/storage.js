@@ -1,10 +1,14 @@
 import {
-  STORAGE_KEYS,
-  CHATGPT_SESSION_WINDOW_MS,
-  CLAUDE_SESSION_WINDOW_MS,
+  SESSION_WINDOW_MS,
+  MS_PER_MINUTE,
+  MS_PER_HOUR,
   createDefaultUsageData,
   getWeekStart,
 } from './constants.js'
+
+function getWindowMs(service) {
+  return SESSION_WINDOW_MS[service] || SESSION_WINDOW_MS.claude
+}
 
 // Get all usage data from storage
 export async function getUsageData() {
@@ -36,8 +40,7 @@ export async function incrementCount(service) {
   }
 
   const now = Date.now()
-  const windowMs =
-    service === STORAGE_KEYS.CHATGPT ? CHATGPT_SESSION_WINDOW_MS : CLAUDE_SESSION_WINDOW_MS
+  const windowMs = getWindowMs(service)
 
   // Check if session window expired - reset if so
   if (now - serviceData.session.windowStart >= windowMs) {
@@ -73,11 +76,9 @@ export async function updateApiSpend(service, spend) {
 
 // Get time remaining until session reset
 export function getTimeUntilReset(service, windowStart) {
-  const windowMs =
-    service === STORAGE_KEYS.CHATGPT ? CHATGPT_SESSION_WINDOW_MS : CLAUDE_SESSION_WINDOW_MS
+  const windowMs = getWindowMs(service)
   const elapsed = Date.now() - windowStart
-  const remaining = Math.max(0, windowMs - elapsed)
-  return remaining
+  return Math.max(0, windowMs - elapsed)
 }
 
 // Format milliseconds to human readable (e.g., "2h 14m")
@@ -85,8 +86,8 @@ export function formatTimeRemaining(ms) {
   if (ms <= 0) {
     return 'now'
   }
-  const hours = Math.floor(ms / (60 * 60 * 1000))
-  const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000))
+  const hours = Math.floor(ms / MS_PER_HOUR)
+  const minutes = Math.floor((ms % MS_PER_HOUR) / MS_PER_MINUTE)
   if (hours > 0) {
     return `${hours}h ${minutes}m`
   }
@@ -99,8 +100,8 @@ export function formatUpdatedAt(timestamp) {
     return 'never'
   }
   const diff = Date.now() - timestamp
-  const hours = Math.floor(diff / (60 * 60 * 1000))
-  const minutes = Math.floor(diff / (60 * 1000))
+  const hours = Math.floor(diff / MS_PER_HOUR)
+  const minutes = Math.floor(diff / MS_PER_MINUTE)
 
   if (hours >= 24) {
     const days = Math.floor(hours / 24)

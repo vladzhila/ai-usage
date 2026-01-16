@@ -1,5 +1,42 @@
 // Popup script - fetches and displays usage data
 
+// Theme constants
+const THEME_KEY = 'theme';
+const DARK = 'dark';
+const LIGHT = 'light';
+
+// Get stored theme
+function getTheme() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(THEME_KEY, (result) => {
+      resolve(result[THEME_KEY] || LIGHT);
+    });
+  });
+}
+
+// Save and apply theme
+function setTheme(theme) {
+  chrome.storage.local.set({ [THEME_KEY]: theme });
+  if (theme === DARK) {
+    document.body.classList.add(DARK);
+  } else {
+    document.body.classList.remove(DARK);
+  }
+}
+
+// Toggle between themes
+function toggleTheme() {
+  const current = document.body.classList.contains(DARK) ? DARK : LIGHT;
+  const next = current === DARK ? LIGHT : DARK;
+  setTheme(next);
+}
+
+// Initialize theme on load
+async function initTheme() {
+  const theme = await getTheme();
+  setTheme(theme);
+}
+
 // Show specific state for a card
 function showState(service, state) {
   const card = document.querySelector(`[data-service="${service}"]`);
@@ -217,6 +254,8 @@ async function fetchData(force = false) {
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   fetchData();
   document.getElementById('refresh').addEventListener('click', () => fetchData(true));
+  document.getElementById('toggle').addEventListener('click', toggleTheme);
 });

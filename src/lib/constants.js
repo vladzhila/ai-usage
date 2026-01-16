@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
   CLAUDE: 'claude',
   OPENAI_API: 'openaiApi',
   ANTHROPIC_API: 'anthropicApi',
+  SHOW_CLAUDE: 'showClaude',
+  SHOW_CODEX: 'showCodex',
 };
 
 // Usage thresholds for color indicators

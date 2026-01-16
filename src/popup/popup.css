@@ -120,6 +120,65 @@ body {
   gap: 6px;
 }
 
+/* Settings Dropdown */
+.settings-wrap {
+  position: relative;
+}
+
+.settings {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  transition: all 0.2s;
+}
+
+.settings:hover {
+  color: var(--text);
+  border-color: var(--blue);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 0;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.dropdown.hidden {
+  display: none;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: var(--bg);
+}
+
+.dropdown-item input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
 .toggle {
   background: transparent;
   border: 1px solid var(--border);
@@ -348,4 +407,21 @@ body.dark .toggle .moon {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Hidden card */
+.card.hidden {
+  display: none;
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 24px 0;
+}
+
+.empty.hidden {
+  display: none;
 }

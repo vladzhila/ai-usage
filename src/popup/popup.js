@@ -5,6 +5,10 @@ const THEME_KEY = 'theme';
 const DARK = 'dark';
 const LIGHT = 'light';
 
+// Visibility constants
+const SHOW_CLAUDE_KEY = 'showClaude';
+const SHOW_CODEX_KEY = 'showCodex';
+
 // Get stored theme
 function getTheme() {
   return new Promise((resolve) => {
@@ -35,6 +39,57 @@ function toggleTheme() {
 async function initTheme() {
   const theme = await getTheme();
   setTheme(theme);
+}
+
+// Get visibility settings from storage
+function getVisibility() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([SHOW_CLAUDE_KEY, SHOW_CODEX_KEY], (result) => {
+      resolve({
+        claude: result[SHOW_CLAUDE_KEY] !== false,
+        codex: result[SHOW_CODEX_KEY] !== false,
+      });
+    });
+  });
+}
+
+// Save visibility setting
+function setVisibility(key, value) {
+  chrome.storage.local.set({ [key]: value });
+}
+
+// Apply visibility to cards and empty state
+function applyVisibility(visibility) {
+  const claudeCard = document.querySelector('[data-service="claude"]');
+  const codexCard = document.querySelector('[data-service="codex"]');
+  const empty = document.getElementById('empty');
+
+  if (claudeCard) {
+    claudeCard.classList.toggle('hidden', !visibility.claude);
+  }
+  if (codexCard) {
+    codexCard.classList.toggle('hidden', !visibility.codex);
+  }
+
+  const bothHidden = !visibility.claude && !visibility.codex;
+  if (empty) {
+    empty.classList.toggle('hidden', !bothHidden);
+  }
+}
+
+// Toggle dropdown visibility
+function toggleDropdown() {
+  const dropdown = document.getElementById('dropdown');
+  dropdown.classList.toggle('hidden');
+}
+
+// Close dropdown when clicking outside
+function handleClickOutside(event) {
+  const wrap = document.querySelector('.settings-wrap');
+  const dropdown = document.getElementById('dropdown');
+  if (wrap && !wrap.contains(event.target)) {
+    dropdown.classList.add('hidden');
+  }
 }
 
 // Show specific state for a card
@@ -225,15 +280,25 @@ async function fetchData(force = false) {
   const btn = document.getElementById('refresh');
   btn.classList.add('spinning');
 
-  // Show loading
-  showState('claude', 'loading');
-  showState('codex', 'loading');
+  const visibility = await getVisibility();
+
+  // Show loading only for visible providers
+  if (visibility.claude) {
+    showState('claude', 'loading');
+  }
+  if (visibility.codex) {
+    showState('codex', 'loading');
+  }
 
   chrome.runtime
-    .sendMessage({ type: 'FETCH_USAGE', force })
+    .sendMessage({ type: 'FETCH_USAGE', force, visibility })
     .then((result) => {
-      updateCard('claude', result.claude);
-      updateCard('codex', result.codex);
+      if (visibility.claude && result.claude.status !== 'hidden') {
+        updateCard('claude', result.claude);
+      }
+      if (visibility.codex && result.codex.status !== 'hidden') {
+        updateCard('codex', result.codex);
+      }
 
       if (result?.meta?.cache) {
         setNotice(result.meta.message || NOTICE_MESSAGE);
@@ -243,8 +308,12 @@ async function fetchData(force = false) {
       setNotice('');
     })
     .catch(() => {
-      setError('claude', ERROR_MESSAGE);
-      setError('codex', ERROR_MESSAGE);
+      if (visibility.claude) {
+        setError('claude', ERROR_MESSAGE);
+      }
+      if (visibility.codex) {
+        setError('codex', ERROR_MESSAGE);
+      }
       setNotice('');
     })
     .finally(() => {
@@ -252,10 +321,46 @@ async function fetchData(force = false) {
     });
 }
 
+// Initialize visibility settings
+async function initVisibility() {
+  const visibility = await getVisibility();
+  const claudeCheckbox = document.getElementById('show-claude');
+  const codexCheckbox = document.getElementById('show-codex');
+
+  // Set checkbox states
+  claudeCheckbox.checked = visibility.claude;
+  codexCheckbox.checked = visibility.codex;
+
+  // Apply visibility to cards
+  applyVisibility(visibility);
+
+  // Wire up checkbox handlers
+  claudeCheckbox.addEventListener('change', (e) => {
+    const checked = e.target.checked;
+    setVisibility(SHOW_CLAUDE_KEY, checked);
+    applyVisibility({ claude: checked, codex: codexCheckbox.checked });
+    if (checked) {
+      fetchData();
+    }
+  });
+
+  codexCheckbox.addEventListener('change', (e) => {
+    const checked = e.target.checked;
+    setVisibility(SHOW_CODEX_KEY, checked);
+    applyVisibility({ claude: claudeCheckbox.checked, codex: checked });
+    if (checked) {
+      fetchData();
+    }
+  });
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  initVisibility();
   fetchData();
   document.getElementById('refresh').addEventListener('click', () => fetchData(true));
   document.getElementById('toggle').addEventListener('click', toggleTheme);
+  document.getElementById('settings').addEventListener('click', toggleDropdown);
+  document.addEventListener('click', handleClickOutside);
 });

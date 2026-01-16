@@ -144,25 +144,43 @@ function hasFailure(results) {
   });
 }
 
-async function fetchAll(force = false) {
+const HIDDEN_RESULT = { status: 'hidden' };
+
+async function fetchAll(force = false, visibility = { claude: true, codex: true }) {
   const cache = await getCache();
   if (!force && isCacheValid(cache)) {
-    return cache;
+    return {
+      claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
+      codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
+    };
   }
 
-  const results = await Promise.allSettled([fetchClaude(), fetchCodex()]);
+  const claudePromise = visibility.claude ? fetchClaude() : Promise.resolve(HIDDEN_RESULT);
+  const codexPromise = visibility.codex ? fetchCodex() : Promise.resolve(HIDDEN_RESULT);
+
+  const results = await Promise.allSettled([claudePromise, codexPromise]);
   const claude = normalizeResult(results[0]);
   const codex = normalizeResult(results[1]);
   const result = { claude, codex };
 
-  if (!hasFailure(results)) {
-    await setCache(result);
+  // Only cache if we fetched visible providers and they succeeded
+  const visibleResults = results.filter((_, i) => (i === 0 ? visibility.claude : visibility.codex));
+  if (visibleResults.length > 0 && !hasFailure(visibleResults)) {
+    const cacheData = { ...cache };
+    if (visibility.claude) {
+      cacheData.claude = claude;
+    }
+    if (visibility.codex) {
+      cacheData.codex = codex;
+    }
+    await setCache(cacheData);
     return result;
   }
 
   if (cache) {
     return {
-      ...cache,
+      claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
+      codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
       meta: {
         cache: true,
         message: CACHE_FALLBACK_MESSAGE,
@@ -177,7 +195,7 @@ async function fetchAll(force = false) {
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === 'FETCH_USAGE') {
-    fetchAll(message.force).then(respond);
+    fetchAll(message.force, message.visibility).then(respond);
     return true;
   }
 });

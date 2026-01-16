@@ -1,104 +1,13 @@
 // Service Worker - handles API calls and caching
 
-const CACHE_KEY = 'usage_cache';
-const CACHE_TTL = 60000; // 1 minute
-
-// ============ Cookie Helpers ============
-
-const SERVICES = {
-  claude: {
-    url: 'https://claude.ai',
-    cookie: 'sessionKey',
-    prefix: 'sk-ant-',
-  },
-  chatgpt: {
-    url: 'https://chatgpt.com',
-    cookie: '__Secure-next-auth.session-token',
-    prefix: null,
-  },
-};
-
-async function getCookie(service) {
-  const config = SERVICES[service];
-  if (!config) {
-    return null;
-  }
-
-  const cookie = await chrome.cookies.get({
-    url: config.url,
-    name: config.cookie,
-  });
-
-  return cookie?.value || null;
-}
-
-function isValid(service, value) {
-  if (!value) {
-    return false;
-  }
-  const config = SERVICES[service];
-  if (config.prefix) {
-    return value.startsWith(config.prefix);
-  }
-  return true;
-}
-
-// ============ API Fetchers ============
-
-async function fetchJson(url) {
-  const response = await fetch(url, { credentials: 'include' });
-
-  if (response.status === 401 || response.status === 403) {
-    return { status: 'expired' };
-  }
-
-  if (!response.ok) {
-    return { status: 'error', message: `HTTP ${response.status}` };
-  }
-
-  return { status: 'ok', data: await response.json() };
-}
-
-async function fetchClaude() {
-  const cookie = await getCookie('claude');
-  console.log('[DEBUG] Claude cookie:', cookie ? 'found' : 'missing');
-
-  if (!isValid('claude', cookie)) {
-    return { status: 'logged_out', message: 'Log into claude.ai to see usage' };
-  }
-
-  const orgs = await fetchJson('https://claude.ai/api/organizations');
-  console.log('[DEBUG] Claude orgs:', JSON.stringify(orgs, null, 2));
-  if (orgs.status !== 'ok') {
-    return orgs;
-  }
-
-  const org = orgs.data?.[0];
-  console.log('[DEBUG] Claude org[0]:', JSON.stringify(org, null, 2));
-  if (!org?.uuid) {
-    return { status: 'error', message: 'No organization found' };
-  }
-
-  const usage = await fetchJson(`https://claude.ai/api/organizations/${org.uuid}/usage`);
-  console.log('[DEBUG] Claude usage:', JSON.stringify(usage, null, 2));
-  if (usage.status !== 'ok') {
-    return usage;
-  }
-
-  // Check for Pro via capabilities array
-  const isPro = org.capabilities?.includes('claude_pro');
-  const fiveHour = usage.data?.five_hour;
-
-  return {
-    status: 'ok',
-    data: {
-      plan: isPro ? 'Pro' : 'Free',
-      used: fiveHour?.utilization || 0,
-      limit: 100, // utilization is percentage
-      reset: fiveHour?.resets_at || null,
-    },
-  };
-}
+import {
+  getCookie,
+  isValid,
+  getCache,
+  setCache,
+  isCacheValid,
+  fetchClaude,
+} from './service-worker-core.js';
 
 async function fetchCodex() {
   const cookie = await getCookie('chatgpt');
@@ -206,26 +115,6 @@ async function fetchCodex() {
     console.log('[DEBUG] Script execution error:', err.message);
     return { status: 'error', message: 'Refresh chatgpt.com tab' };
   }
-}
-
-// ============ Cache ============
-
-async function getCache() {
-  const result = await chrome.storage.local.get(CACHE_KEY);
-  return result[CACHE_KEY] || null;
-}
-
-async function setCache(data) {
-  await chrome.storage.local.set({
-    [CACHE_KEY]: { ...data, timestamp: Date.now() },
-  });
-}
-
-function isCacheValid(cache) {
-  if (!cache?.timestamp) {
-    return false;
-  }
-  return Date.now() - cache.timestamp < CACHE_TTL;
 }
 
 // ============ Main Handler ============

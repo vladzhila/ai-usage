@@ -1,10 +1,25 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, beforeEach } from 'bun:test';
+import { createChromeMock, clearMocks, setStorage, getStorage } from './mocks/chrome.js';
+
+// Setup global chrome mock before importing storage module
+const chrome = createChromeMock();
+globalThis.chrome = chrome;
+
 import {
   formatTimeRemaining,
   formatUpdatedAt,
   getTimeUntilReset,
+  getUsageData,
+  saveUsageData,
+  incrementCount,
+  updateApiSpend,
 } from '../src/lib/storage.js';
-import { STORAGE_KEYS, CHATGPT_SESSION_WINDOW_MS, CLAUDE_SESSION_WINDOW_MS } from '../src/lib/constants.js';
+import {
+  STORAGE_KEYS,
+  CHATGPT_SESSION_WINDOW_MS,
+  CLAUDE_SESSION_WINDOW_MS,
+  createDefaultUsageData,
+} from '../src/lib/constants.js';
 
 describe('formatTimeRemaining', () => {
   test('formats hours and minutes correctly', () => {
@@ -104,5 +119,105 @@ describe('getTimeUntilReset', () => {
     const remaining = getTimeUntilReset(STORAGE_KEYS.CHATGPT, windowStart);
 
     expect(remaining).toBeCloseTo(CHATGPT_SESSION_WINDOW_MS, -3);
+  });
+});
+
+describe('getUsageData', () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+
+  test('returns default data when storage empty', async () => {
+    const data = await getUsageData();
+    expect(data).toHaveProperty(STORAGE_KEYS.CHATGPT);
+    expect(data).toHaveProperty(STORAGE_KEYS.CLAUDE);
+  });
+
+  test('returns stored data when present', async () => {
+    setStorage('foo', 'bar');
+    const data = await getUsageData();
+    expect(data.foo).toBe('bar');
+  });
+});
+
+describe('saveUsageData', () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+
+  test('saves data to storage', async () => {
+    await saveUsageData({ testKey: 'testValue' });
+    const stored = getStorage('testKey');
+    expect(stored).toBe('testValue');
+  });
+
+  test('saves multiple keys', async () => {
+    await saveUsageData({ key1: 'value1', key2: 'value2' });
+    expect(getStorage('key1')).toBe('value1');
+    expect(getStorage('key2')).toBe('value2');
+  });
+});
+
+describe('incrementCount', () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+
+  test('increments session and weekly count', async () => {
+    const defaults = createDefaultUsageData();
+    setStorage(STORAGE_KEYS.CHATGPT, defaults[STORAGE_KEYS.CHATGPT]);
+
+    const result = await incrementCount(STORAGE_KEYS.CHATGPT);
+
+    expect(result.session.count).toBe(1);
+    expect(result.weekly.count).toBe(1);
+  });
+
+  test('increments multiple times', async () => {
+    const defaults = createDefaultUsageData();
+    setStorage(STORAGE_KEYS.CLAUDE, defaults[STORAGE_KEYS.CLAUDE]);
+
+    await incrementCount(STORAGE_KEYS.CLAUDE);
+    const result = await incrementCount(STORAGE_KEYS.CLAUDE);
+
+    expect(result.session.count).toBe(2);
+    expect(result.weekly.count).toBe(2);
+  });
+
+  test('returns undefined for unknown service', async () => {
+    const result = await incrementCount('unknown');
+    expect(result).toBeUndefined();
+  });
+
+  test('resets session count when window expired', async () => {
+    const defaults = createDefaultUsageData();
+    defaults[STORAGE_KEYS.CHATGPT].session.count = 50;
+    defaults[STORAGE_KEYS.CHATGPT].session.windowStart = Date.now() - (4 * 60 * 60 * 1000); // 4 hours ago
+    setStorage(STORAGE_KEYS.CHATGPT, defaults[STORAGE_KEYS.CHATGPT]);
+
+    const result = await incrementCount(STORAGE_KEYS.CHATGPT);
+
+    expect(result.session.count).toBe(1); // Reset to 1
+    expect(result.weekly.count).toBe(1);
+  });
+});
+
+describe('updateApiSpend', () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+
+  test('saves spend data', async () => {
+    const result = await updateApiSpend('openaiApi', 25.50);
+
+    expect(result.spend).toBe(25.50);
+    expect(result.updatedAt).toBeGreaterThan(0);
+  });
+
+  test('updates existing spend', async () => {
+    await updateApiSpend('anthropicApi', 10);
+    const result = await updateApiSpend('anthropicApi', 20);
+
+    expect(result.spend).toBe(20);
   });
 });

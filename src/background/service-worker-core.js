@@ -1,8 +1,8 @@
 // Core service worker logic - extracted for testability
 
-export const CACHE_KEY = 'usage_cache';
-export const CACHE_TTL = 60000; // 1 minute
-export const FETCH_ERROR_MESSAGE = 'Fetch failed';
+export const CACHE_KEY = 'usage_cache'
+export const CACHE_TTL = 60000 // 1 minute
+export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
 export const SERVICES = {
   claude: {
@@ -15,93 +15,93 @@ export const SERVICES = {
     cookie: '__Secure-next-auth.session-token',
     prefix: null,
   },
-};
+}
 
 export async function getCookie(service) {
-  const config = SERVICES[service];
+  const config = SERVICES[service]
   if (!config) {
-    return null;
+    return null
   }
 
   const cookie = await chrome.cookies.get({
     url: config.url,
     name: config.cookie,
-  });
+  })
 
-  return cookie?.value || null;
+  return cookie?.value || null
 }
 
 export function isValid(service, value) {
   if (!value) {
-    return false;
+    return false
   }
-  const config = SERVICES[service];
+  const config = SERVICES[service]
   if (config.prefix) {
-    return value.startsWith(config.prefix);
+    return value.startsWith(config.prefix)
   }
-  return true;
+  return true
 }
 
 export async function fetchJson(url) {
-  const response = await fetch(url, { credentials: 'include' }).catch(() => null);
+  const response = await fetch(url, { credentials: 'include' }).catch(() => null)
 
   if (!response) {
-    return { status: 'error', message: FETCH_ERROR_MESSAGE };
+    return { status: 'error', message: FETCH_ERROR_MESSAGE }
   }
 
   if (response.status === 401 || response.status === 403) {
-    return { status: 'expired' };
+    return { status: 'expired' }
   }
 
   if (!response.ok) {
-    return { status: 'error', message: `HTTP ${response.status}` };
+    return { status: 'error', message: `HTTP ${response.status}` }
   }
 
-  return { status: 'ok', data: await response.json() };
+  return { status: 'ok', data: await response.json() }
 }
 
 export async function getCache() {
-  const result = await chrome.storage.local.get(CACHE_KEY);
-  return result[CACHE_KEY] || null;
+  const result = await chrome.storage.local.get(CACHE_KEY)
+  return result[CACHE_KEY] || null
 }
 
 export async function setCache(data) {
   await chrome.storage.local.set({
     [CACHE_KEY]: { ...data, timestamp: Date.now() },
-  });
+  })
 }
 
 export function isCacheValid(cache) {
   if (!cache?.timestamp) {
-    return false;
+    return false
   }
-  return Date.now() - cache.timestamp < CACHE_TTL;
+  return Date.now() - cache.timestamp < CACHE_TTL
 }
 
 export async function fetchClaude() {
-  const cookie = await getCookie('claude');
+  const cookie = await getCookie('claude')
 
   if (!isValid('claude', cookie)) {
-    return { status: 'logged_out', message: 'Log into claude.ai to see usage' };
+    return { status: 'logged_out', message: 'Log into claude.ai to see usage' }
   }
 
-  const orgs = await fetchJson('https://claude.ai/api/organizations');
+  const orgs = await fetchJson('https://claude.ai/api/organizations')
   if (orgs.status !== 'ok') {
-    return orgs;
+    return orgs
   }
 
-  const org = orgs.data?.[0];
+  const org = orgs.data?.[0]
   if (!org?.uuid) {
-    return { status: 'error', message: 'No organization found' };
+    return { status: 'error', message: 'No organization found' }
   }
 
-  const usage = await fetchJson(`https://claude.ai/api/organizations/${org.uuid}/usage`);
+  const usage = await fetchJson(`https://claude.ai/api/organizations/${org.uuid}/usage`)
   if (usage.status !== 'ok') {
-    return usage;
+    return usage
   }
 
-  const isPro = org.capabilities?.includes('claude_pro');
-  const fiveHour = usage.data?.five_hour;
+  const isPro = org.capabilities?.includes('claude_pro')
+  const fiveHour = usage.data?.five_hour
 
   return {
     status: 'ok',
@@ -111,5 +111,5 @@ export async function fetchClaude() {
       limit: 100,
       reset: fiveHour?.resets_at || null,
     },
-  };
+  }
 }

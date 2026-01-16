@@ -8,6 +8,7 @@ const LIGHT = 'light'
 // Visibility constants
 const SHOW_CLAUDE_KEY = 'showClaude'
 const SHOW_CODEX_KEY = 'showCodex'
+const SHOW_CURSOR_KEY = 'showCursor'
 
 // Get stored theme
 function getTheme() {
@@ -44,10 +45,11 @@ async function initTheme() {
 // Get visibility settings from storage
 function getVisibility() {
   return new Promise((resolve) => {
-    chrome.storage.local.get([SHOW_CLAUDE_KEY, SHOW_CODEX_KEY], (result) => {
+    chrome.storage.local.get([SHOW_CLAUDE_KEY, SHOW_CODEX_KEY, SHOW_CURSOR_KEY], (result) => {
       resolve({
         claude: result[SHOW_CLAUDE_KEY] !== false,
         codex: result[SHOW_CODEX_KEY] !== false,
+        cursor: result[SHOW_CURSOR_KEY] !== false,
       })
     })
   })
@@ -62,6 +64,7 @@ function setVisibility(key, value) {
 function applyVisibility(visibility) {
   const claudeCard = document.querySelector('[data-service="claude"]')
   const codexCard = document.querySelector('[data-service="codex"]')
+  const cursorCard = document.querySelector('[data-service="cursor"]')
   const empty = document.getElementById('empty')
 
   if (claudeCard) {
@@ -70,10 +73,13 @@ function applyVisibility(visibility) {
   if (codexCard) {
     codexCard.classList.toggle('hidden', !visibility.codex)
   }
+  if (cursorCard) {
+    cursorCard.classList.toggle('hidden', !visibility.cursor)
+  }
 
-  const bothHidden = !visibility.claude && !visibility.codex
+  const allHidden = !visibility.claude && !visibility.codex && !visibility.cursor
   if (empty) {
-    empty.classList.toggle('hidden', !bothHidden)
+    empty.classList.toggle('hidden', !allHidden)
   }
 }
 
@@ -187,13 +193,18 @@ function updateCard(service, result) {
     return
   }
 
-  // Claude: single window
+  // Claude + Cursor: single window
   const used = data.used || 0
   const limit = data.limit || 0
   const percent = getUsagePercent(used, limit)
 
   setField(card, 'usage', percent)
   updateBar(card, 'bar', percent)
+
+  if (service === 'cursor') {
+    setField(card, 'reset', formatWeeklyReset(data.reset))
+    return
+  }
 
   setField(card, 'reset', formatReset(data.reset))
 }
@@ -297,6 +308,9 @@ async function fetchData(force = false) {
   if (visibility.codex) {
     showState('codex', 'loading')
   }
+  if (visibility.cursor) {
+    showState('cursor', 'loading')
+  }
 
   chrome.runtime
     .sendMessage({ type: 'FETCH_USAGE', force, visibility })
@@ -306,6 +320,9 @@ async function fetchData(force = false) {
       }
       if (visibility.codex && result.codex.status !== 'hidden') {
         updateCard('codex', result.codex)
+      }
+      if (visibility.cursor && result.cursor && result.cursor.status !== 'hidden') {
+        updateCard('cursor', result.cursor)
       }
 
       if (result?.meta?.cache) {
@@ -322,6 +339,9 @@ async function fetchData(force = false) {
       if (visibility.codex) {
         setError('codex', ERROR_MESSAGE)
       }
+      if (visibility.cursor) {
+        setError('cursor', ERROR_MESSAGE)
+      }
       setNotice('')
     })
     .finally(() => {
@@ -334,10 +354,12 @@ async function initVisibility() {
   const visibility = await getVisibility()
   const claudeCheckbox = document.getElementById('show-claude')
   const codexCheckbox = document.getElementById('show-codex')
+  const cursorCheckbox = document.getElementById('show-cursor')
 
   // Set checkbox states
   claudeCheckbox.checked = visibility.claude
   codexCheckbox.checked = visibility.codex
+  cursorCheckbox.checked = visibility.cursor
 
   // Apply visibility to cards
   applyVisibility(visibility)
@@ -346,7 +368,11 @@ async function initVisibility() {
   claudeCheckbox.addEventListener('change', (e) => {
     const checked = e.target.checked
     setVisibility(SHOW_CLAUDE_KEY, checked)
-    applyVisibility({ claude: checked, codex: codexCheckbox.checked })
+    applyVisibility({
+      claude: checked,
+      codex: codexCheckbox.checked,
+      cursor: cursorCheckbox.checked,
+    })
     if (checked) {
       fetchData()
     }
@@ -355,7 +381,24 @@ async function initVisibility() {
   codexCheckbox.addEventListener('change', (e) => {
     const checked = e.target.checked
     setVisibility(SHOW_CODEX_KEY, checked)
-    applyVisibility({ claude: claudeCheckbox.checked, codex: checked })
+    applyVisibility({
+      claude: claudeCheckbox.checked,
+      codex: checked,
+      cursor: cursorCheckbox.checked,
+    })
+    if (checked) {
+      fetchData()
+    }
+  })
+
+  cursorCheckbox.addEventListener('change', (e) => {
+    const checked = e.target.checked
+    setVisibility(SHOW_CURSOR_KEY, checked)
+    applyVisibility({
+      claude: claudeCheckbox.checked,
+      codex: codexCheckbox.checked,
+      cursor: checked,
+    })
     if (checked) {
       fetchData()
     }

@@ -42,6 +42,10 @@
                 <input type="checkbox" id="show-codex" checked />
                 <span>Codex</span>
               </label>
+              <label class="dropdown-item">
+                <input type="checkbox" id="show-cursor" checked />
+                <span>Cursor</span>
+              </label>
             </div>
           </div>
           <button class="toggle" id="toggle" title="Toggle theme">
@@ -94,7 +98,7 @@
         <!-- Claude Card -->
         <article class="card" data-service="claude">
           <div class="card-head">
-            <span class="name">Claude</span>
+            <a class="name" href="https://claude.ai/settings/usage" target="_blank">Claude</a>
             <span class="dot" data-status="loading"></span>
           </div>
           <div class="card-body" data-state="loading">
@@ -130,7 +134,9 @@
         <!-- Codex Card -->
         <article class="card" data-service="codex">
           <div class="card-head">
-            <span class="name">Codex</span>
+            <a class="name" href="https://chatgpt.com/codex/settings/usage" target="_blank"
+              >Codex</a
+            >
             <span class="dot" data-status="loading"></span>
           </div>
           <div class="card-body" data-state="loading">
@@ -170,6 +176,61 @@
             <div class="row">
               <span class="label">RESETS</span>
               <span class="muted" data-field="weekly-reset">--</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Cursor Card -->
+        <article class="card" data-service="cursor">
+          <div class="card-head">
+            <a class="name" href="https://cursor.com/dashboard" target="_blank">Cursor</a>
+            <span class="dot" data-status="loading"></span>
+          </div>
+          <div class="card-body" data-state="loading">
+            <div class="loader"></div>
+          </div>
+          <div class="card-body" data-state="logged_out" style="display: none">
+            <div class="instructions">
+              <div class="instructions-icon">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </div>
+              <ol class="steps">
+                <li>Open <a href="https://cursor.com/dashboard" target="_blank">cursor.com</a></li>
+                <li>Sign in to your account</li>
+                <li>Click refresh above</li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="card-body" data-state="error" style="display: none">
+            <p class="error" data-field="error">Error loading data</p>
+          </div>
+          <div class="card-body" data-state="ok" style="display: none">
+            <div class="row">
+              <span class="label">PLAN</span>
+              <span class="badge" data-field="plan">Pro</span>
+            </div>
+            <div class="row">
+              <span class="label">USAGE</span>
+              <span class="value"><span data-field="usage">0</span>%</span>
+            </div>
+            <div class="progress">
+              <div class="bar" data-field="bar" style="width: 0%"></div>
+            </div>
+            <div class="row">
+              <span class="label">RESETS</span>
+              <span class="muted" data-field="reset">--</span>
             </div>
           </div>
         </article>

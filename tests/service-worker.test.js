@@ -24,6 +24,7 @@ import {
   setCache,
   isCacheValid,
   fetchClaude,
+  fetchCursor,
 } from '../src/background/service-worker-core.js'
 
 describe('SERVICES config', () => {
@@ -39,6 +40,13 @@ describe('SERVICES config', () => {
     expect(SERVICES.chatgpt.url).toBe('https://chatgpt.com')
     expect(SERVICES.chatgpt.cookie).toBe('__Secure-next-auth.session-token')
     expect(SERVICES.chatgpt.prefix).toBeNull()
+  })
+
+  test('has cursor config', () => {
+    expect(SERVICES.cursor).toBeDefined()
+    expect(SERVICES.cursor.url).toBe('https://cursor.com')
+    expect(SERVICES.cursor.cookie).toBe('WorkosCursorSessionToken')
+    expect(SERVICES.cursor.prefix).toBeNull()
   })
 })
 
@@ -68,6 +76,12 @@ describe('getCookie', () => {
     const result = await getCookie('chatgpt')
     expect(result).toBe('session-123')
   })
+
+  test('returns cookie value for cursor', async () => {
+    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
+    const result = await getCookie('cursor')
+    expect(result).toBe('cursor-session')
+  })
 })
 
 describe('isValid', () => {
@@ -85,6 +99,11 @@ describe('isValid', () => {
   test('accepts any non-empty chatgpt cookie', () => {
     expect(isValid('chatgpt', 'any-value')).toBe(true)
     expect(isValid('chatgpt', 'x')).toBe(true)
+  })
+
+  test('accepts any non-empty cursor cookie', () => {
+    expect(isValid('cursor', 'cursor-session')).toBe(true)
+    expect(isValid('cursor', 'x')).toBe(true)
   })
 })
 
@@ -193,10 +212,12 @@ describe('fetchClaude', () => {
     expect(result.message).toContain('Log into claude.ai')
   })
 
-  test('returns logged_out for invalid cookie prefix', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'invalid-prefix')
+  test('returns error when fetch fails', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+    mockFetch.mockImplementation(() => Promise.reject(new Error('Network error')))
     const result = await fetchClaude()
-    expect(result.status).toBe('logged_out')
+    expect(result.status).toBe('error')
+    expect(result.message).toBe(FETCH_ERROR_MESSAGE)
   })
 
   test('returns error when no organization found', async () => {
@@ -217,9 +238,7 @@ describe('fetchClaude', () => {
   test('returns usage data on success', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 
-    let callCount = 0
     mockFetch.mockImplementation((url) => {
-      callCount++
       if (url.includes('/organizations') && !url.includes('/usage')) {
         return Promise.resolve({
           ok: true,
@@ -269,5 +288,46 @@ describe('fetchClaude', () => {
     const result = await fetchClaude()
     expect(result.status).toBe('ok')
     expect(result.data.plan).toBe('Free')
+  })
+})
+
+const CURSOR_USAGE_RESPONSE = {
+  billingCycleEnd: '2026-01-20T14:05:00Z',
+  membershipType: 'pro',
+  individualUsage: {
+    plan: {
+      used: 2500,
+      limit: 10000,
+      breakdown: {
+        total: 10000,
+      },
+    },
+    onDemand: {
+      used: 500,
+    },
+  },
+}
+
+const CURSOR_USER_RESPONSE = {
+  email: 'user@example.com',
+}
+
+describe('fetchCursor', () => {
+  test('returns error for missing payload', () => {
+    const result = fetchCursor()
+    expect(result.status).toBe('error')
+  })
+
+  test('returns usage data on success', () => {
+    const result = fetchCursor({
+      usage: CURSOR_USAGE_RESPONSE,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Cursor Pro')
+    expect(result.data.used).toBe(25)
+    expect(result.data.limit).toBe(100)
+    expect(result.data.reset).toBe(Date.parse('2026-01-20T14:05:00Z'))
   })
 })

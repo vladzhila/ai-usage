@@ -49,11 +49,12 @@ body {
   background: var(--bg);
   font-family: var(--sans);
   color: var(--text);
+  overflow: hidden;
 }
 
 .container {
   position: relative;
-  padding: 16px;
+  padding: 12px;
 }
 
 /* Header */
@@ -61,8 +62,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -215,14 +216,14 @@ body.dark .toggle .moon {
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   box-shadow: var(--card-shadow);
 }
 
@@ -237,6 +238,9 @@ body.dark .toggle .moon {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 /* Status dot */
@@ -396,6 +400,10 @@ body.dark .toggle .moon {
 
 .card:nth-child(2) {
   animation-delay: 0.05s;
+}
+
+.card:nth-child(3) {
+  animation-delay: 0.1s;
 }
 
 @keyframes fadeIn {

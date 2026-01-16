@@ -4,6 +4,16 @@ export const CACHE_KEY = 'usage_cache'
 export const CACHE_TTL = 60000 // 1 minute
 export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
+const CURSOR_DEFAULT_PLAN = 'Cursor'
+const CURSOR_PLAN_ENTERPRISE = 'Cursor Enterprise'
+const CURSOR_PLAN_PRO = 'Cursor Pro'
+const CURSOR_PLAN_HOBBY = 'Cursor Hobby'
+const CURSOR_PLAN_TEAM = 'Cursor Team'
+const CURSOR_PLAN_PREFIX = 'Cursor '
+const CURSOR_DATA_ERROR = 'No Cursor data'
+const PERCENT_MAX = 100
+const CENTS_PER_DOLLAR = 100
+
 export const SERVICES = {
   claude: {
     url: 'https://claude.ai',
@@ -13,6 +23,11 @@ export const SERVICES = {
   chatgpt: {
     url: 'https://chatgpt.com',
     cookie: '__Secure-next-auth.session-token',
+    prefix: null,
+  },
+  cursor: {
+    url: 'https://cursor.com',
+    cookie: 'WorkosCursorSessionToken',
     prefix: null,
   },
 }
@@ -112,4 +127,87 @@ export async function fetchClaude() {
       reset: fiveHour?.resets_at || null,
     },
   }
+}
+
+function formatCursorPlan(type) {
+  if (!type) {
+    return CURSOR_DEFAULT_PLAN
+  }
+
+  const normalized = String(type).trim().toLowerCase()
+  if (!normalized) {
+    return CURSOR_DEFAULT_PLAN
+  }
+
+  if (normalized === 'enterprise') {
+    return CURSOR_PLAN_ENTERPRISE
+  }
+
+  if (normalized === 'pro') {
+    return CURSOR_PLAN_PRO
+  }
+
+  if (normalized === 'hobby') {
+    return CURSOR_PLAN_HOBBY
+  }
+
+  if (normalized === 'team') {
+    return CURSOR_PLAN_TEAM
+  }
+
+  return `${CURSOR_PLAN_PREFIX}${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`
+}
+
+function toPercent(used, limit) {
+  if (!limit || limit <= 0) {
+    return 0
+  }
+
+  const ratio = used / limit
+  const percent = Math.round(ratio * PERCENT_MAX)
+  return Math.min(PERCENT_MAX, Math.max(0, percent))
+}
+
+function parseCursorSummary(payload) {
+  if (!payload) {
+    return { status: 'error', message: CURSOR_DATA_ERROR }
+  }
+
+  if (payload.status && payload.status !== 'ok') {
+    return payload
+  }
+
+  const usage = payload.usage || payload
+  const user = payload.user || {}
+  const summary = usage?.usage || usage
+  const individual = summary?.individualUsage || {}
+  const plan = individual?.plan || {}
+  const breakdown = plan?.breakdown || {}
+  const onDemand = individual?.onDemand || {}
+
+  const planUsedRaw = Number(plan.used || 0)
+  const planLimitRaw = Number(breakdown.total ?? plan.limit ?? 0)
+  const percent = toPercent(planUsedRaw, planLimitRaw)
+
+  const onDemandUsedRaw = Number(onDemand.used || 0)
+  const onDemandUsed = onDemandUsedRaw / CENTS_PER_DOLLAR
+
+  const cycleEnd = summary?.billingCycleEnd
+  const reset = cycleEnd ? Date.parse(cycleEnd) : null
+
+  return {
+    status: 'ok',
+    data: {
+      plan: formatCursorPlan(summary?.membershipType),
+      used: percent,
+      limit: 100,
+      reset: Number.isNaN(reset) ? null : reset,
+      onDemand: onDemandUsed,
+      email: user?.email || null,
+    },
+  }
+}
+
+export function fetchCursor(payload) {
+  return parseCursorSummary(payload)
 }

@@ -7,7 +7,18 @@ import {
   setCache,
   isCacheValid,
   fetchClaude,
+  fetchCursor,
 } from './service-worker-core.js'
+
+const CHATGPT_URL = 'https://chatgpt.com'
+const CHATGPT_SESSION_URL = `${CHATGPT_URL}/api/auth/session`
+const CHATGPT_USAGE_URL = `${CHATGPT_URL}/backend-api/wham/usage`
+const CURSOR_URL = 'https://cursor.com'
+const CURSOR_USAGE_URL = `${CURSOR_URL}/api/usage-summary`
+const CURSOR_USER_URL = `${CURSOR_URL}/api/auth/me`
+const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
+const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
+const CODEX_TOKEN_MESSAGE = 'No access token in session'
 
 const CACHE_FALLBACK_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.'
 const FALLBACK_ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
@@ -17,106 +28,105 @@ async function fetchCodex() {
   console.log('[DEBUG] Codex cookie:', cookie ? 'found' : 'missing')
 
   if (!isValid('chatgpt', cookie)) {
-    return { status: 'logged_out', message: 'Log into chatgpt.com to see usage' }
-  }
-
-  // Find a chatgpt.com tab
-  const tabs = await chrome.tabs.query({ url: 'https://chatgpt.com/*' })
-  console.log('[DEBUG] Found chatgpt.com tabs:', tabs.length)
-
-  if (tabs.length === 0) {
-    return {
-      status: 'error',
-      message: 'Open chatgpt.com in a tab',
-    }
+    return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
   }
 
   try {
-    // Step 1: Get access token from session API
-    const session = await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      world: 'MAIN',
-      func: async () => {
-        try {
-          const res = await fetch('https://chatgpt.com/api/auth/session', {
-            credentials: 'include',
-          })
-          if (!res.ok) {
-            return { error: `Session HTTP ${res.status}` }
-          }
-          return res.json()
-        } catch (err) {
-          return { error: err.message }
-        }
-      },
-    })
-
-    const sessionData = session?.[0]?.result
-    console.log('[DEBUG] Session result:', sessionData?.accessToken ? 'token found' : 'no token')
-
-    if (sessionData?.error) {
-      return { status: 'error', message: sessionData.error }
+    const session = await fetch(CHATGPT_SESSION_URL, { credentials: 'include' })
+    if (session.status === 401 || session.status === 403) {
+      return { status: 'expired' }
     }
+
+    if (!session.ok) {
+      return { status: 'error', message: `Session HTTP ${session.status}` }
+    }
+
+    const sessionData = await session.json()
+    console.log('[DEBUG] Session result:', sessionData?.accessToken ? 'token found' : 'no token')
 
     const token = sessionData?.accessToken
     if (!token) {
-      return { status: 'expired', message: 'No access token in session' }
+      return { status: 'expired', message: CODEX_TOKEN_MESSAGE }
     }
 
-    // Step 2: Fetch usage with Bearer token
-    const usage = await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      world: 'MAIN',
-      func: async (bearerToken) => {
-        try {
-          const res = await fetch('https://chatgpt.com/backend-api/wham/usage', {
-            credentials: 'include',
-            headers: {
-              Authorization: `Bearer ${bearerToken}`,
-            },
-          })
-
-          if (res.status === 401 || res.status === 403) {
-            return { status: 'expired' }
-          }
-
-          if (!res.ok) {
-            return { status: 'error', message: `HTTP ${res.status}` }
-          }
-
-          const data = await res.json()
-          const primary = data.rate_limit?.primary_window
-          const secondary = data.rate_limit?.secondary_window
-
-          const toMs = (seconds) => (seconds ? seconds * 1000 : null)
-
-          return {
-            status: 'ok',
-            data: {
-              plan: data.plan_type || 'Free',
-              session: {
-                used: primary?.used_percent || 0,
-                reset: toMs(primary?.reset_at),
-              },
-              weekly: {
-                used: secondary?.used_percent || 0,
-                reset: toMs(secondary?.reset_at),
-              },
-            },
-          }
-        } catch (err) {
-          return { status: 'error', message: err.message }
-        }
+    const usage = await fetch(CHATGPT_USAGE_URL, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-      args: [token],
     })
 
-    const result = usage?.[0]?.result
-    console.log('[DEBUG] Codex usage result:', JSON.stringify(result, null, 2))
-    return result || { status: 'error', message: 'No result from script' }
+    if (usage.status === 401 || usage.status === 403) {
+      return { status: 'expired' }
+    }
+
+    if (!usage.ok) {
+      return { status: 'error', message: `HTTP ${usage.status}` }
+    }
+
+    const data = await usage.json()
+    const primary = data.rate_limit?.primary_window
+    const secondary = data.rate_limit?.secondary_window
+
+    const toMs = (seconds) => (seconds ? seconds * 1000 : null)
+
+    return {
+      status: 'ok',
+      data: {
+        plan: data.plan_type || 'Free',
+        session: {
+          used: primary?.used_percent || 0,
+          reset: toMs(primary?.reset_at),
+        },
+        weekly: {
+          used: secondary?.used_percent || 0,
+          reset: toMs(secondary?.reset_at),
+        },
+      },
+    }
   } catch (err) {
-    console.log('[DEBUG] Script execution error:', err.message)
+    console.log('[DEBUG] Codex fetch error:', err.message)
     return { status: 'error', message: 'Refresh chatgpt.com tab' }
+  }
+}
+
+async function fetchCursorUsage() {
+  const cookie = await getCookie('cursor')
+  console.log('[DEBUG] Cursor cookie:', cookie ? 'found' : 'missing')
+
+  if (!isValid('cursor', cookie)) {
+    return { status: 'logged_out', message: CURSOR_LOGIN_MESSAGE }
+  }
+
+  try {
+    const [usage, user] = await Promise.all([
+      fetch(CURSOR_USAGE_URL, { credentials: 'include' }),
+      fetch(CURSOR_USER_URL, { credentials: 'include' }),
+    ])
+
+    if (
+      usage.status === 401 ||
+      usage.status === 403 ||
+      user.status === 401 ||
+      user.status === 403
+    ) {
+      return { status: 'expired' }
+    }
+
+    if (!usage.ok) {
+      return { status: 'error', message: `HTTP ${usage.status}` }
+    }
+
+    if (!user.ok) {
+      return { status: 'error', message: `HTTP ${user.status}` }
+    }
+
+    const usageData = await usage.json()
+    const userData = await user.json()
+    return fetchCursor({ usage: usageData, user: userData })
+  } catch (err) {
+    console.log('[DEBUG] Cursor fetch error:', err.message)
+    return { status: 'error', message: 'Refresh cursor.com tab' }
   }
 }
 
@@ -146,25 +156,36 @@ function hasFailure(results) {
 
 const HIDDEN_RESULT = { status: 'hidden' }
 
-async function fetchAll(force = false, visibility = { claude: true, codex: true }) {
+async function fetchAll(force = false, visibility = { claude: true, codex: true, cursor: true }) {
   const cache = await getCache()
   if (!force && isCacheValid(cache)) {
     return {
       claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
       codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
+      cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
     }
   }
 
   const claudePromise = visibility.claude ? fetchClaude() : Promise.resolve(HIDDEN_RESULT)
   const codexPromise = visibility.codex ? fetchCodex() : Promise.resolve(HIDDEN_RESULT)
+  const cursorPromise = visibility.cursor ? fetchCursorUsage() : Promise.resolve(HIDDEN_RESULT)
 
-  const results = await Promise.allSettled([claudePromise, codexPromise])
+  const results = await Promise.allSettled([claudePromise, codexPromise, cursorPromise])
   const claude = normalizeResult(results[0])
   const codex = normalizeResult(results[1])
-  const result = { claude, codex }
+  const cursor = normalizeResult(results[2])
+  const result = { claude, codex, cursor }
 
   // Only cache if we fetched visible providers and they succeeded
-  const visibleResults = results.filter((_, i) => (i === 0 ? visibility.claude : visibility.codex))
+  const visibleResults = results.filter((_, i) => {
+    if (i === 0) {
+      return visibility.claude
+    }
+    if (i === 1) {
+      return visibility.codex
+    }
+    return visibility.cursor
+  })
   if (visibleResults.length > 0 && !hasFailure(visibleResults)) {
     const cacheData = { ...cache }
     if (visibility.claude) {
@@ -172,6 +193,9 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true 
     }
     if (visibility.codex) {
       cacheData.codex = codex
+    }
+    if (visibility.cursor) {
+      cacheData.cursor = cursor
     }
     await setCache(cacheData)
     return result
@@ -181,6 +205,7 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true 
     return {
       claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
       codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
+      cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
       meta: {
         cache: true,
         message: CACHE_FALLBACK_MESSAGE,
@@ -191,11 +216,43 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true 
   return result
 }
 
+async function safeFetchAll(force, visibility) {
+  try {
+    return await fetchAll(force, visibility)
+  } catch (err) {
+    console.log('[DEBUG] Fetch all error:', err?.message || err)
+    const cache = await getCache()
+    if (cache) {
+      return {
+        claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
+        codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
+        cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
+        meta: {
+          cache: true,
+          message: CACHE_FALLBACK_MESSAGE,
+        },
+      }
+    }
+
+    return {
+      claude: visibility.claude
+        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+        : HIDDEN_RESULT,
+      codex: visibility.codex
+        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+        : HIDDEN_RESULT,
+      cursor: visibility.cursor
+        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+        : HIDDEN_RESULT,
+    }
+  }
+}
+
 // ============ Message Listener ============
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === 'FETCH_USAGE') {
-    fetchAll(message.force, message.visibility).then(respond)
+    safeFetchAll(message.force, message.visibility).then(respond)
     return true
   }
 })

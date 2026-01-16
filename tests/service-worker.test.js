@@ -325,7 +325,7 @@ describe('fetchCursor', () => {
     })
 
     expect(result.status).toBe('ok')
-    expect(result.data.plan).toBe('Cursor Pro')
+    expect(result.data.plan).toBe('Pro')
     expect(result.data.used).toBe(25)
     expect(result.data.limit).toBe(100)
     expect(result.data.reset).toBe(Date.parse('2026-01-20T14:05:00Z'))

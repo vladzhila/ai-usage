@@ -5,11 +5,16 @@ export const CACHE_TTL = 60000 // 1 minute
 export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
 const CURSOR_DEFAULT_PLAN = 'Cursor'
-const CURSOR_PLAN_ENTERPRISE = 'Cursor Enterprise'
-const CURSOR_PLAN_PRO = 'Cursor Pro'
-const CURSOR_PLAN_HOBBY = 'Cursor Hobby'
-const CURSOR_PLAN_TEAM = 'Cursor Team'
-const CURSOR_PLAN_PREFIX = 'Cursor '
+const CURSOR_PLAN_ENTERPRISE = 'Enterprise'
+const CURSOR_PLAN_PRO = 'Pro'
+const CURSOR_PLAN_HOBBY = 'Hobby'
+const CURSOR_PLAN_TEAM = 'Team'
+const CURSOR_PLAN_FREE = 'Free'
+const CURSOR_TYPE_ENTERPRISE = 'enterprise'
+const CURSOR_TYPE_FREE = 'free'
+const CURSOR_TYPE_HOBBY = 'hobby'
+const CURSOR_TYPE_PRO = 'pro'
+const CURSOR_TYPE_TEAM = 'team'
 const CURSOR_DATA_ERROR = 'No Cursor data'
 const PERCENT_MAX = 100
 const CENTS_PER_DOLLAR = 100
@@ -139,23 +144,27 @@ function formatCursorPlan(type) {
     return CURSOR_DEFAULT_PLAN
   }
 
-  if (normalized === 'enterprise') {
+  if (normalized === CURSOR_TYPE_FREE) {
+    return CURSOR_PLAN_FREE
+  }
+
+  if (normalized === CURSOR_TYPE_ENTERPRISE) {
     return CURSOR_PLAN_ENTERPRISE
   }
 
-  if (normalized === 'pro') {
+  if (normalized === CURSOR_TYPE_PRO) {
     return CURSOR_PLAN_PRO
   }
 
-  if (normalized === 'hobby') {
+  if (normalized === CURSOR_TYPE_HOBBY) {
     return CURSOR_PLAN_HOBBY
   }
 
-  if (normalized === 'team') {
+  if (normalized === CURSOR_TYPE_TEAM) {
     return CURSOR_PLAN_TEAM
   }
 
-  return `${CURSOR_PLAN_PREFIX}${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`
 }
 
 function toPercent(used, limit) {

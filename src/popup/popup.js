@@ -49,6 +49,15 @@ function setField(card, field, value) {
   }
 }
 
+function getUsagePercent(used, limit) {
+  if (limit <= 0) {
+    return 0;
+  }
+  const ratio = used / limit;
+  const percent = Math.round(ratio * MAX_PERCENT);
+  return Math.min(MAX_PERCENT, percent);
+}
+
 // Update card with data
 function updateCard(service, result) {
   const card = document.querySelector(`[data-service="${service}"]`);
@@ -88,10 +97,10 @@ function updateCard(service, result) {
 
   // Claude: single window
   const used = data.used || 0;
-  setField(card, 'used', used);
-  setField(card, 'limit', data.limit || '\u221e');
+  const limit = data.limit || 0;
+  const percent = getUsagePercent(used, limit);
 
-  const percent = data.limit > 0 ? Math.min(100, (used / data.limit) * 100) : 0;
+  setField(card, 'usage', percent);
   updateBar(card, 'bar', percent);
 
   setField(card, 'reset', formatReset(data.reset));
@@ -101,6 +110,7 @@ const MS_PER_MINUTE = 60000;
 const MS_PER_HOUR = 3600000;
 const MS_PER_DAY = 86400000;
 const SPIN_DELAY_MS = 300;
+const MAX_PERCENT = 100;
 const NOTICE_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.';
 const ERROR_MESSAGE = 'Fetch failed. Try updating manually.';
 const NOTICE_ID = 'notice';

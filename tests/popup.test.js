@@ -47,6 +47,15 @@ function getStatus(percentage) {
   return 'ok';
 }
 
+function getUsagePercent(used, limit) {
+  if (limit <= 0) {
+    return 0;
+  }
+  const ratio = used / limit;
+  const percent = Math.round(ratio * 100);
+  return Math.min(100, percent);
+}
+
 describe('Popup - formatTimeRemaining', () => {
   test('formats hours and minutes', () => {
     expect(formatTimeRemaining(2 * 60 * 60 * 1000 + 30 * 60 * 1000)).toBe('2h 30m');
@@ -97,5 +106,20 @@ describe('Popup - getStatus', () => {
 
   test('returns "danger" for over 100%', () => {
     expect(getStatus(1.5)).toBe('danger');
+  });
+});
+
+describe('Popup - getUsagePercent', () => {
+  test('returns zero when limit is zero', () => {
+    expect(getUsagePercent(10, 0)).toBe(0);
+  });
+
+  test('rounds to nearest whole percent', () => {
+    expect(getUsagePercent(1, 3)).toBe(33);
+    expect(getUsagePercent(2, 3)).toBe(67);
+  });
+
+  test('caps usage at 100%', () => {
+    expect(getUsagePercent(200, 100)).toBe(100);
   });
 });

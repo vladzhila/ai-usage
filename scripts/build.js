@@ -14,13 +14,10 @@ const MODE_PROD = 'production'
 const BUILD_MESSAGE = 'Build complete: dist/'
 const ICON_MESSAGE = 'Generated placeholder icons (replace with real icons for production)'
 const SKIP_EXT = new Set(['.js', '.css'])
-const ENTRYPOINTS = [
-  'background/service-worker.js',
-  'content-scripts/codex-fetcher.js',
-  'popup/popup.js',
-  'popup/popup.css',
-].map((entry) => join(SRC, entry))
-const STATICS = ['popup', 'background', 'lib', 'content-scripts']
+const ENTRYPOINTS = ['background/service-worker.js', 'popup/popup.js', 'popup/popup.css'].map(
+  (entry) => join(SRC, entry)
+)
+const STATICS = ['popup', 'background', 'lib']
 const ICON_SIZES = [16, 48, 128]
 const MIN_PNG = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,

@@ -24,7 +24,6 @@ const FALLBACK_ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
 
 async function fetchCodex() {
   const cookie = await getCookie('chatgpt')
-  console.log('[DEBUG] Codex cookie:', cookie ? 'found' : 'missing')
 
   if (!isValid('chatgpt', cookie)) {
     return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
@@ -41,7 +40,6 @@ async function fetchCodex() {
     }
 
     const sessionData = await session.json()
-    console.log('[DEBUG] Session result:', sessionData?.accessToken ? 'token found' : 'no token')
 
     const token = sessionData?.accessToken
     if (!token) {
@@ -81,15 +79,13 @@ async function fetchCodex() {
         },
       },
     }
-  } catch (err) {
-    console.log('[DEBUG] Codex fetch error:', err.message)
+  } catch {
     return { status: 'error', message: 'Refresh chatgpt.com tab' }
   }
 }
 
 async function fetchCursorUsage() {
   const cookie = await getCookie('cursor')
-  console.log('[DEBUG] Cursor cookie:', cookie ? 'found' : 'missing')
 
   if (!isValid('cursor', cookie)) {
     return { status: 'logged_out', message: CURSOR_LOGIN_MESSAGE }
@@ -116,8 +112,7 @@ async function fetchCursorUsage() {
     const usageData = await usage.json()
     const userData = await user.json()
     return fetchCursor({ usage: usageData, user: userData })
-  } catch (err) {
-    console.log('[DEBUG] Cursor fetch error:', err.message)
+  } catch {
     return { status: 'error', message: 'Refresh cursor.com tab' }
   }
 }
@@ -211,8 +206,7 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true,
 async function safeFetchAll(force, visibility) {
   try {
     return await fetchAll(force, visibility)
-  } catch (err) {
-    console.log('[DEBUG] Fetch all error:', err?.message || err)
+  } catch {
     const cache = await getCache()
     if (cache) {
       return {
@@ -243,5 +237,3 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     return true
   }
 })
-
-console.log('[AI Usage] Service worker ready')

@@ -23,7 +23,6 @@ async function fetchCodexUsage() {
     }
 
     const data = await response.json()
-    console.log('[AI Usage] Codex data:', data)
 
     // Extract usage from response
     const primary = data.rate_limit?.primary_window

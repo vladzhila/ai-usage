@@ -13,9 +13,8 @@ import {
 const CHATGPT_URL = 'https://chatgpt.com'
 const CHATGPT_SESSION_URL = `${CHATGPT_URL}/api/auth/session`
 const CHATGPT_USAGE_URL = `${CHATGPT_URL}/backend-api/wham/usage`
-const CURSOR_URL = 'https://cursor.com'
-const CURSOR_USAGE_URL = `${CURSOR_URL}/api/usage-summary`
-const CURSOR_USER_URL = `${CURSOR_URL}/api/auth/me`
+const CURSOR_USAGE_URL = 'https://cursor.com/api/usage-summary'
+const CURSOR_USER_URL = 'https://cursor.com/api/auth/me'
 const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
 const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
 const CODEX_TOKEN_MESSAGE = 'No access token in session'
@@ -68,19 +67,17 @@ async function fetchCodex() {
     const primary = data.rate_limit?.primary_window
     const secondary = data.rate_limit?.secondary_window
 
-    const toMs = (seconds) => (seconds ? seconds * 1000 : null)
-
     return {
       status: 'ok',
       data: {
         plan: data.plan_type || 'Free',
         session: {
           used: primary?.used_percent || 0,
-          reset: toMs(primary?.reset_at),
+          reset: primary?.reset_at ? primary.reset_at * 1000 : null,
         },
         weekly: {
           used: secondary?.used_percent || 0,
-          reset: toMs(secondary?.reset_at),
+          reset: secondary?.reset_at ? secondary.reset_at * 1000 : null,
         },
       },
     }
@@ -104,12 +101,7 @@ async function fetchCursorUsage() {
       fetch(CURSOR_USER_URL, { credentials: 'include' }),
     ])
 
-    if (
-      usage.status === 401 ||
-      usage.status === 403 ||
-      user.status === 401 ||
-      user.status === 403
-    ) {
+    if ([usage, user].some((response) => response.status === 401 || response.status === 403)) {
       return { status: 'expired' }
     }
 
@@ -234,16 +226,11 @@ async function safeFetchAll(force, visibility) {
       }
     }
 
+    const errorResult = { status: 'error', message: FALLBACK_ERROR_MESSAGE }
     return {
-      claude: visibility.claude
-        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
-        : HIDDEN_RESULT,
-      codex: visibility.codex
-        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
-        : HIDDEN_RESULT,
-      cursor: visibility.cursor
-        ? { status: 'error', message: FALLBACK_ERROR_MESSAGE }
-        : HIDDEN_RESULT,
+      claude: visibility.claude ? errorResult : HIDDEN_RESULT,
+      codex: visibility.codex ? errorResult : HIDDEN_RESULT,
+      cursor: visibility.cursor ? errorResult : HIDDEN_RESULT,
     }
   }
 }

@@ -2,6 +2,7 @@
 
 export const CACHE_KEY = 'usage_cache';
 export const CACHE_TTL = 60000; // 1 minute
+export const FETCH_ERROR_MESSAGE = 'Fetch failed';
 
 export const SERVICES = {
   claude: {
@@ -42,7 +43,11 @@ export function isValid(service, value) {
 }
 
 export async function fetchJson(url) {
-  const response = await fetch(url, { credentials: 'include' });
+  const response = await fetch(url, { credentials: 'include' }).catch(() => null);
+
+  if (!response) {
+    return { status: 'error', message: FETCH_ERROR_MESSAGE };
+  }
 
   if (response.status === 401 || response.status === 403) {
     return { status: 'expired' };

@@ -9,6 +9,9 @@ import {
   fetchClaude,
 } from './service-worker-core.js';
 
+const CACHE_FALLBACK_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.';
+const FALLBACK_ERROR_MESSAGE = 'Fetch failed. Try updating manually.';
+
 async function fetchCodex() {
   const cookie = await getCookie('chatgpt');
   console.log('[DEBUG] Codex cookie:', cookie ? 'found' : 'missing');
@@ -119,20 +122,53 @@ async function fetchCodex() {
 
 // ============ Main Handler ============
 
-async function fetchAll(force = false) {
-  // Check cache first
-  if (!force) {
-    const cache = await getCache();
-    if (isCacheValid(cache)) {
-      return cache;
-    }
+function isFailure(result) {
+  return result?.status === 'error';
+}
+
+function normalizeResult(result) {
+  if (result.status === 'fulfilled') {
+    return result.value;
   }
 
-  // Fetch fresh data
-  const [claude, codex] = await Promise.all([fetchClaude(), fetchCodex()]);
+  return { status: 'error', message: FALLBACK_ERROR_MESSAGE };
+}
 
+function hasFailure(results) {
+  return results.some((result) => {
+    if (result.status === 'rejected') {
+      return true;
+    }
+
+    return isFailure(result.value);
+  });
+}
+
+async function fetchAll(force = false) {
+  const cache = await getCache();
+  if (!force && isCacheValid(cache)) {
+    return cache;
+  }
+
+  const results = await Promise.allSettled([fetchClaude(), fetchCodex()]);
+  const claude = normalizeResult(results[0]);
+  const codex = normalizeResult(results[1]);
   const result = { claude, codex };
-  await setCache(result);
+
+  if (!hasFailure(results)) {
+    await setCache(result);
+    return result;
+  }
+
+  if (cache) {
+    return {
+      ...cache,
+      meta: {
+        cache: true,
+        message: CACHE_FALLBACK_MESSAGE,
+      },
+    };
+  }
 
   return result;
 }

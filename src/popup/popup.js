@@ -100,6 +100,10 @@ function updateCard(service, result) {
 const MS_PER_MINUTE = 60000;
 const MS_PER_HOUR = 3600000;
 const MS_PER_DAY = 86400000;
+const SPIN_DELAY_MS = 300;
+const NOTICE_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.';
+const ERROR_MESSAGE = 'Fetch failed. Try updating manually.';
+const NOTICE_ID = 'notice';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Format reset time as relative (Xh Xm)
@@ -143,6 +147,32 @@ function formatResetDate(timestamp) {
   return `${MONTHS[reset.getMonth()]} ${reset.getDate()}`;
 }
 
+function setNotice(message) {
+  const notice = document.getElementById(NOTICE_ID);
+  if (!notice) {
+    return;
+  }
+
+  if (!message) {
+    notice.textContent = '';
+    notice.classList.add('hidden');
+    return;
+  }
+
+  notice.textContent = message;
+  notice.classList.remove('hidden');
+}
+
+function setError(service, message) {
+  const card = document.querySelector(`[data-service="${service}"]`);
+  if (!card) {
+    return;
+  }
+
+  showState(service, 'error');
+  setField(card, 'error', message);
+}
+
 // Fetch data from service worker
 async function fetchData(force = false) {
   const btn = document.getElementById('refresh');
@@ -152,12 +182,27 @@ async function fetchData(force = false) {
   showState('claude', 'loading');
   showState('codex', 'loading');
 
-  const result = await chrome.runtime.sendMessage({ type: 'FETCH_USAGE', force });
+  chrome.runtime
+    .sendMessage({ type: 'FETCH_USAGE', force })
+    .then((result) => {
+      updateCard('claude', result.claude);
+      updateCard('codex', result.codex);
 
-  updateCard('claude', result.claude);
-  updateCard('codex', result.codex);
+      if (result?.meta?.cache) {
+        setNotice(result.meta.message || NOTICE_MESSAGE);
+        return;
+      }
 
-  setTimeout(() => btn.classList.remove('spinning'), 300);
+      setNotice('');
+    })
+    .catch(() => {
+      setError('claude', ERROR_MESSAGE);
+      setError('codex', ERROR_MESSAGE);
+      setNotice('');
+    })
+    .finally(() => {
+      setTimeout(() => btn.classList.remove('spinning'), SPIN_DELAY_MS);
+    });
 }
 
 // Init

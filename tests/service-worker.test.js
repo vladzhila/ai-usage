@@ -6,7 +6,9 @@ const chrome = createChromeMock();
 globalThis.chrome = chrome;
 
 // Mock fetch
-const mockFetch = mock(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }));
+const mockFetch = mock(() =>
+  Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+);
 globalThis.fetch = mockFetch;
 
 // Import after setting up mocks
@@ -14,6 +16,7 @@ import {
   SERVICES,
   CACHE_KEY,
   CACHE_TTL,
+  FETCH_ERROR_MESSAGE,
   getCookie,
   isValid,
   fetchJson,
@@ -148,31 +151,33 @@ describe('fetchJson', () => {
   });
 
   test('returns expired on 401', async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve({ ok: false, status: 401 })
-    );
+    mockFetch.mockImplementation(() => Promise.resolve({ ok: false, status: 401 }));
 
     const result = await fetchJson('https://example.com/api');
     expect(result.status).toBe('expired');
   });
 
   test('returns expired on 403', async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve({ ok: false, status: 403 })
-    );
+    mockFetch.mockImplementation(() => Promise.resolve({ ok: false, status: 403 }));
 
     const result = await fetchJson('https://example.com/api');
     expect(result.status).toBe('expired');
   });
 
   test('returns error on other failures', async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve({ ok: false, status: 500 })
-    );
+    mockFetch.mockImplementation(() => Promise.resolve({ ok: false, status: 500 }));
 
     const result = await fetchJson('https://example.com/api');
     expect(result.status).toBe('error');
     expect(result.message).toBe('HTTP 500');
+  });
+
+  test('returns error when fetch throws', async function () {
+    mockFetch.mockImplementation(() => Promise.reject(new Error('Network error')));
+
+    const result = await fetchJson('https://example.com/api');
+    expect(result.status).toBe('error');
+    expect(result.message).toBe(FETCH_ERROR_MESSAGE);
   });
 });
 
@@ -226,7 +231,8 @@ describe('fetchClaude', () => {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: () => Promise.resolve({ five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } }),
+          json: () =>
+            Promise.resolve({ five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } }),
         });
       }
       return Promise.resolve({ ok: false, status: 404 });

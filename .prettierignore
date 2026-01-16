@@ -3,3 +3,4 @@ dist/
 build/
 coverage/
 .claude/settings.local.json
+.husky/pre-commit

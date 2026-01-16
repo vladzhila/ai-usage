@@ -11,8 +11,8 @@
     "test:coverage": "bun test --coverage",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write \"**/*.{js,ts,tsx,jsx,css,html,md,json,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{js,ts,tsx,jsx,css,html,md,json,yml,yaml}\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -24,11 +24,7 @@
     "lint-staged": "latest"
   },
   "lint-staged": {
-    "src/**/*.js": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "src/**/*.{css,html}": [
+    "*/**": [
       "prettier --write"
     ]
   }

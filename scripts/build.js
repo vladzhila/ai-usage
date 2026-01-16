@@ -96,7 +96,13 @@ function watch(args) {
 
 async function bundle(isWatch) {
   const mode = isWatch ? MODE_DEV : MODE_PROD
-  const minify = !isWatch
+  const minify = isWatch
+    ? false
+    : {
+        whitespace: true,
+        identifiers: true,
+        syntax: true,
+      }
 
   const result = await Bun.build({
     entrypoints: ENTRYPOINTS,

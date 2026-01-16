@@ -1,15 +1,12 @@
 {
   "manifest_version": 3,
   "name": "AI Usage Tracker",
-  "version": "1.0.0",
-  "description": "Track ChatGPT, Claude, OpenAI API, and Anthropic API usage in one place",
-  "permissions": ["storage", "alarms"],
+  "version": "2.1.0",
+  "description": "Track Claude and Codex usage limits in one place",
+  "permissions": ["storage", "cookies", "scripting", "tabs"],
   "host_permissions": [
-    "https://chat.openai.com/*",
-    "https://chatgpt.com/*",
     "https://claude.ai/*",
-    "https://platform.openai.com/*",
-    "https://console.anthropic.com/*"
+    "https://chatgpt.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -24,23 +21,8 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
-      "js": ["content-scripts/chatgpt.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["https://claude.ai/*"],
-      "js": ["content-scripts/claude.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["https://platform.openai.com/*"],
-      "js": ["content-scripts/openai-dashboard.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://console.anthropic.com/*"],
-      "js": ["content-scripts/anthropic-dashboard.js"],
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content-scripts/codex-fetcher.js"],
       "run_at": "document_idle"
     }
   ],

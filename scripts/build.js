@@ -15,7 +15,7 @@ mkdirSync(DIST);
 copyFileSync(join(ROOT, 'manifest.json'), join(DIST, 'manifest.json'));
 
 // Copy source directories
-const dirs = ['popup', 'background', 'content-scripts', 'lib'];
+const dirs = ['popup', 'background', 'lib', 'content-scripts'];
 for (const dir of dirs) {
   const srcDir = join(SRC, dir);
   const distDir = join(DIST, dir);

@@ -1,149 +1,260 @@
-// Service Worker for AI Usage Tracker
-// Handles messages from content scripts and manages storage
+// Service Worker - handles API calls and caching
 
-// Constants (duplicated here since service workers can't easily import ES modules)
-const CHATGPT_SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
-const CLAUDE_SESSION_WINDOW_MS = 5 * 60 * 60 * 1000;
-const CHATGPT_SESSION_LIMIT = 150;
-const CLAUDE_SESSION_LIMIT = 45;
+const CACHE_KEY = 'usage_cache';
+const CACHE_TTL = 60000; // 1 minute
 
-const STORAGE_KEYS = {
-  CHATGPT: 'chatgpt',
-  CLAUDE: 'claude',
-  OPENAI_API: 'openaiApi',
-  ANTHROPIC_API: 'anthropicApi',
+// ============ Cookie Helpers ============
+
+const SERVICES = {
+  claude: {
+    url: 'https://claude.ai',
+    cookie: 'sessionKey',
+    prefix: 'sk-ant-',
+  },
+  chatgpt: {
+    url: 'https://chatgpt.com',
+    cookie: '__Secure-next-auth.session-token',
+    prefix: null,
+  },
 };
 
-function getWeekStart() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.setDate(diff));
-  monday.setHours(0, 0, 0, 0);
-  return monday.getTime();
+async function getCookie(service) {
+  const config = SERVICES[service];
+  if (!config) {
+    return null;
+  }
+
+  const cookie = await chrome.cookies.get({
+    url: config.url,
+    name: config.cookie,
+  });
+
+  return cookie?.value || null;
 }
 
-function createDefaultUsageData() {
+function isValid(service, value) {
+  if (!value) {
+    return false;
+  }
+  const config = SERVICES[service];
+  if (config.prefix) {
+    return value.startsWith(config.prefix);
+  }
+  return true;
+}
+
+// ============ API Fetchers ============
+
+async function fetchJson(url) {
+  const response = await fetch(url, { credentials: 'include' });
+
+  if (response.status === 401 || response.status === 403) {
+    return { status: 'expired' };
+  }
+
+  if (!response.ok) {
+    return { status: 'error', message: `HTTP ${response.status}` };
+  }
+
+  return { status: 'ok', data: await response.json() };
+}
+
+async function fetchClaude() {
+  const cookie = await getCookie('claude');
+  console.log('[DEBUG] Claude cookie:', cookie ? 'found' : 'missing');
+
+  if (!isValid('claude', cookie)) {
+    return { status: 'logged_out', message: 'Log into claude.ai to see usage' };
+  }
+
+  const orgs = await fetchJson('https://claude.ai/api/organizations');
+  console.log('[DEBUG] Claude orgs:', JSON.stringify(orgs, null, 2));
+  if (orgs.status !== 'ok') {
+    return orgs;
+  }
+
+  const org = orgs.data?.[0];
+  console.log('[DEBUG] Claude org[0]:', JSON.stringify(org, null, 2));
+  if (!org?.uuid) {
+    return { status: 'error', message: 'No organization found' };
+  }
+
+  const usage = await fetchJson(`https://claude.ai/api/organizations/${org.uuid}/usage`);
+  console.log('[DEBUG] Claude usage:', JSON.stringify(usage, null, 2));
+  if (usage.status !== 'ok') {
+    return usage;
+  }
+
+  // Check for Pro via capabilities array
+  const isPro = org.capabilities?.includes('claude_pro');
+  const fiveHour = usage.data?.five_hour;
+
   return {
-    [STORAGE_KEYS.CHATGPT]: {
-      session: { count: 0, limit: CHATGPT_SESSION_LIMIT, windowStart: Date.now() },
-      weekly: { count: 0, weekStart: getWeekStart() },
+    status: 'ok',
+    data: {
+      plan: isPro ? 'Pro' : 'Free',
+      used: fiveHour?.utilization || 0,
+      limit: 100, // utilization is percentage
+      reset: fiveHour?.resets_at || null,
     },
-    [STORAGE_KEYS.CLAUDE]: {
-      session: { count: 0, limit: CLAUDE_SESSION_LIMIT, windowStart: Date.now() },
-      weekly: { count: 0, weekStart: getWeekStart() },
-    },
-    [STORAGE_KEYS.OPENAI_API]: { spend: 0, updatedAt: null },
-    [STORAGE_KEYS.ANTHROPIC_API]: { spend: 0, updatedAt: null },
   };
 }
 
-async function getUsageData() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(null, (data) => {
-      if (!data || Object.keys(data).length === 0) {
-        resolve(createDefaultUsageData());
-      } else {
-        resolve(data);
-      }
+async function fetchCodex() {
+  const cookie = await getCookie('chatgpt');
+  console.log('[DEBUG] Codex cookie:', cookie ? 'found' : 'missing');
+
+  if (!isValid('chatgpt', cookie)) {
+    return { status: 'logged_out', message: 'Log into chatgpt.com to see usage' };
+  }
+
+  // Find a chatgpt.com tab
+  const tabs = await chrome.tabs.query({ url: 'https://chatgpt.com/*' });
+  console.log('[DEBUG] Found chatgpt.com tabs:', tabs.length);
+
+  if (tabs.length === 0) {
+    return {
+      status: 'error',
+      message: 'Open chatgpt.com in a tab',
+    };
+  }
+
+  try {
+    // Step 1: Get access token from session API
+    const session = await chrome.scripting.executeScript({
+      target: { tabId: tabs[0].id },
+      world: 'MAIN',
+      func: async () => {
+        try {
+          const res = await fetch('https://chatgpt.com/api/auth/session', {
+            credentials: 'include',
+          });
+          if (!res.ok) {
+            return { error: `Session HTTP ${res.status}` };
+          }
+          return res.json();
+        } catch (err) {
+          return { error: err.message };
+        }
+      },
     });
+
+    const sessionData = session?.[0]?.result;
+    console.log('[DEBUG] Session result:', sessionData?.accessToken ? 'token found' : 'no token');
+
+    if (sessionData?.error) {
+      return { status: 'error', message: sessionData.error };
+    }
+
+    const token = sessionData?.accessToken;
+    if (!token) {
+      return { status: 'expired', message: 'No access token in session' };
+    }
+
+    // Step 2: Fetch usage with Bearer token
+    const usage = await chrome.scripting.executeScript({
+      target: { tabId: tabs[0].id },
+      world: 'MAIN',
+      func: async (bearerToken) => {
+        try {
+          const res = await fetch('https://chatgpt.com/backend-api/wham/usage', {
+            credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${bearerToken}`,
+            },
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            return { status: 'expired' };
+          }
+
+          if (!res.ok) {
+            return { status: 'error', message: `HTTP ${res.status}` };
+          }
+
+          const data = await res.json();
+          const primary = data.rate_limit?.primary_window;
+          const secondary = data.rate_limit?.secondary_window;
+
+          const toMs = (seconds) => (seconds ? seconds * 1000 : null);
+
+          return {
+            status: 'ok',
+            data: {
+              plan: data.plan_type || 'Free',
+              session: {
+                used: primary?.used_percent || 0,
+                reset: toMs(primary?.reset_at),
+              },
+              weekly: {
+                used: secondary?.used_percent || 0,
+                reset: toMs(secondary?.reset_at),
+              },
+            },
+          };
+        } catch (err) {
+          return { status: 'error', message: err.message };
+        }
+      },
+      args: [token],
+    });
+
+    const result = usage?.[0]?.result;
+    console.log('[DEBUG] Codex usage result:', JSON.stringify(result, null, 2));
+    return result || { status: 'error', message: 'No result from script' };
+  } catch (err) {
+    console.log('[DEBUG] Script execution error:', err.message);
+    return { status: 'error', message: 'Refresh chatgpt.com tab' };
+  }
+}
+
+// ============ Cache ============
+
+async function getCache() {
+  const result = await chrome.storage.local.get(CACHE_KEY);
+  return result[CACHE_KEY] || null;
+}
+
+async function setCache(data) {
+  await chrome.storage.local.set({
+    [CACHE_KEY]: { ...data, timestamp: Date.now() },
   });
 }
 
-async function saveUsageData(data) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set(data, resolve);
-  });
+function isCacheValid(cache) {
+  if (!cache?.timestamp) {
+    return false;
+  }
+  return Date.now() - cache.timestamp < CACHE_TTL;
 }
 
-async function incrementCount(serviceKey) {
-  const data = await getUsageData();
-  const service = serviceKey === 'chatgpt' ? STORAGE_KEYS.CHATGPT : STORAGE_KEYS.CLAUDE;
-  let serviceData = data[service];
+// ============ Main Handler ============
 
-  if (!serviceData) {
-    serviceData = createDefaultUsageData()[service];
+async function fetchAll(force = false) {
+  // Check cache first
+  if (!force) {
+    const cache = await getCache();
+    if (isCacheValid(cache)) {
+      return cache;
+    }
   }
 
-  const now = Date.now();
-  const windowMs =
-    service === STORAGE_KEYS.CHATGPT ? CHATGPT_SESSION_WINDOW_MS : CLAUDE_SESSION_WINDOW_MS;
+  // Fetch fresh data
+  const [claude, codex] = await Promise.all([fetchClaude(), fetchCodex()]);
 
-  // Reset session if window expired
-  if (now - serviceData.session.windowStart >= windowMs) {
-    serviceData.session.count = 0;
-    serviceData.session.windowStart = now;
-  }
+  const result = { claude, codex };
+  await setCache(result);
 
-  // Reset weekly if week rolled over
-  const currentWeekStart = getWeekStart();
-  if (serviceData.weekly.weekStart < currentWeekStart) {
-    serviceData.weekly.count = 0;
-    serviceData.weekly.weekStart = currentWeekStart;
-  }
-
-  serviceData.session.count++;
-  serviceData.weekly.count++;
-
-  await saveUsageData({ [service]: serviceData });
-  updateBadge(serviceData.session.count, serviceData.session.limit);
-  return serviceData;
+  return result;
 }
 
-async function updateApiSpend(serviceKey, spend) {
-  const service = serviceKey === 'openaiApi' ? STORAGE_KEYS.OPENAI_API : STORAGE_KEYS.ANTHROPIC_API;
-  const data = {
-    spend,
-    updatedAt: Date.now(),
-  };
-  await saveUsageData({ [service]: data });
-  return data;
-}
+// ============ Message Listener ============
 
-function updateBadge(count, limit) {
-  const percentage = count / limit;
-  let color = '#22c55e'; // green
-  if (percentage >= 0.8) {
-    color = '#ef4444'; // red
-  } else if (percentage >= 0.5) {
-    color = '#eab308'; // yellow
-  }
-
-  chrome.action.setBadgeBackgroundColor({ color });
-  chrome.action.setBadgeText({ text: percentage >= 0.5 ? `${count}` : '' });
-}
-
-// Listen for messages from content scripts
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === 'INCREMENT_COUNT') {
-    incrementCount(message.service).then((data) => {
-      sendResponse({ success: true, data });
-    });
-    return true; // Keep channel open for async response
-  }
-
-  if (message.type === 'UPDATE_API_SPEND') {
-    updateApiSpend(message.service, message.spend).then((data) => {
-      sendResponse({ success: true, data });
-    });
-    return true;
-  }
-
-  if (message.type === 'GET_USAGE_DATA') {
-    getUsageData().then((data) => {
-      sendResponse(data);
-    });
+chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+  if (message.type === 'FETCH_USAGE') {
+    fetchAll(message.force).then(respond);
     return true;
   }
 });
 
-// Initialize on install
-chrome.runtime.onInstalled.addListener(async () => {
-  const data = await getUsageData();
-  if (Object.keys(data).length === 0) {
-    await saveUsageData(createDefaultUsageData());
-  }
-  console.log('[AI Usage Tracker] Extension installed');
-});
-
-console.log('[AI Usage Tracker] Service worker initialized');
+console.log('[AI Usage] Service worker ready');

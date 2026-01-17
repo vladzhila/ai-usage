@@ -167,12 +167,16 @@ body {
   gap: 8px;
   padding: 8px 12px;
   font-size: 13px;
-  cursor: grab;
+  cursor: pointer;
   transition: background 0.15s;
 }
 
 .dropdown-item:hover {
   background: var(--bg);
+}
+
+.dropdown-item[draggable='true'] {
+  cursor: grab;
 }
 
 .dropdown-item.dragging {
@@ -197,35 +201,44 @@ body {
   cursor: grab;
 }
 
-.toggle {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px;
-  cursor: pointer;
-  color: var(--muted);
+.theme-toggle {
   display: flex;
-  transition: all 0.2s;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: left;
 }
 
-.toggle:hover {
+.theme-toggle:hover {
   color: var(--text);
-  border-color: var(--yellow);
 }
 
-.toggle .sun {
+.theme-toggle .toggle-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--label);
+}
+
+.theme-toggle .sun {
   display: block;
 }
 
-.toggle .moon {
+.theme-toggle .moon {
   display: none;
 }
 
-body.dark .toggle .sun {
+body.dark .theme-toggle .sun {
   display: none;
 }
 
-body.dark .toggle .moon {
+body.dark .theme-toggle .moon {
   display: block;
 }
 

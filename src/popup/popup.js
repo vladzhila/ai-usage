@@ -90,7 +90,7 @@ async function initOrder() {
   applyOrder(order)
 
   const dropdown = document.getElementById('dropdown')
-  const items = dropdown.querySelectorAll('.dropdown-item')
+  const items = dropdown.querySelectorAll('[draggable="true"]')
   let dragged = null
 
   function onDragStart(e) {

@@ -17,6 +17,19 @@
       <header class="header">
         <h1 class="title">AI USAGE</h1>
         <div class="controls">
+          <button class="refresh" id="refresh" title="Refresh">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 12a9 9 0 11-2.636-6.364" />
+              <path d="M21 3v6h-6" />
+            </svg>
+          </button>
           <div class="settings-wrap">
             <button class="settings" id="settings" title="Settings">
               <svg
@@ -34,6 +47,41 @@
               </svg>
             </button>
             <div class="dropdown hidden" id="dropdown">
+              <button
+                class="dropdown-item theme-toggle"
+                id="toggle"
+                type="button"
+                title="Toggle theme"
+              >
+                <span class="toggle-label">Theme</span>
+                <span class="toggle-icons">
+                  <svg
+                    class="sun"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle cx="12" cy="12" r="4" />
+                    <path
+                      d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                    />
+                  </svg>
+                  <svg
+                    class="moon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                  </svg>
+                </span>
+              </button>
               <div class="dropdown-item" data-provider="claude" draggable="true">
                 <span class="drag-handle">⠿</span>
                 <input type="checkbox" id="show-claude" checked />
@@ -51,46 +99,6 @@
               </div>
             </div>
           </div>
-          <button class="toggle" id="toggle" title="Toggle theme">
-            <svg
-              class="sun"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="12" cy="12" r="4" />
-              <path
-                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
-              />
-            </svg>
-            <svg
-              class="moon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-            </svg>
-          </button>
-          <button class="refresh" id="refresh" title="Refresh">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M21 12a9 9 0 11-2.636-6.364" />
-              <path d="M21 3v6h-6" />
-            </svg>
-          </button>
         </div>
       </header>
 

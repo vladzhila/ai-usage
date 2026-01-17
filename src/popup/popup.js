@@ -1,7 +1,7 @@
 // Popup script - fetches and displays usage data
 
 import { formatReset, formatWeeklyReset, getUsagePercent } from '../lib/format.js'
-import { SERVICES, parseVisibility, isAllHidden } from '../lib/visibility.js'
+import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
 // Theme constants
 const THEME_KEY = 'theme'
@@ -53,6 +53,99 @@ function getVisibility() {
 // Save visibility setting
 function setVisibility(key, value) {
   chrome.storage.local.set({ [key]: value })
+}
+
+// Get order from storage
+function getOrder() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(ORDER_KEY, (result) => {
+      resolve(parseOrder(result))
+    })
+  })
+}
+
+// Save order to storage
+function setOrder(order) {
+  chrome.storage.local.set({ [ORDER_KEY]: order })
+}
+
+// Apply CSS order to cards and dropdown items
+function applyOrder(order) {
+  const dropdown = document.getElementById('dropdown')
+  order.forEach((provider, index) => {
+    const card = document.querySelector(`[data-service="${provider}"]`)
+    const item = dropdown.querySelector(`[data-provider="${provider}"]`)
+    if (card) {
+      card.style.order = index
+    }
+    if (item) {
+      item.style.order = index
+    }
+  })
+}
+
+// Initialize order and drag-drop on load
+async function initOrder() {
+  const order = await getOrder()
+  applyOrder(order)
+
+  const dropdown = document.getElementById('dropdown')
+  const items = dropdown.querySelectorAll('.dropdown-item')
+  let dragged = null
+
+  function onDragStart(e) {
+    dragged = e.currentTarget
+    dragged.classList.add('dragging')
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function onDragEnd() {
+    dragged.classList.remove('dragging')
+    items.forEach((i) => i.classList.remove('drag-over'))
+    dragged = null
+  }
+
+  function onDragOver(e) {
+    e.preventDefault()
+    const target = e.currentTarget
+    if (dragged && dragged !== target) {
+      target.classList.add('drag-over')
+    }
+  }
+
+  function onDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over')
+  }
+
+  async function onDrop(e) {
+    e.preventDefault()
+    const target = e.currentTarget
+    target.classList.remove('drag-over')
+
+    if (!dragged || dragged === target) {
+      return
+    }
+
+    // Capture before await (dragend may null dragged during async)
+    const from = dragged.dataset.provider
+    const to = target.dataset.provider
+    const current = await getOrder()
+    const fromIdx = current.indexOf(from)
+    const toIdx = current.indexOf(to)
+
+    current.splice(fromIdx, 1)
+    current.splice(toIdx, 0, from)
+    setOrder(current)
+    applyOrder(current)
+  }
+
+  items.forEach((item) => {
+    item.addEventListener('dragstart', onDragStart)
+    item.addEventListener('dragend', onDragEnd)
+    item.addEventListener('dragover', onDragOver)
+    item.addEventListener('dragleave', onDragLeave)
+    item.addEventListener('drop', onDrop)
+  })
 }
 
 // Run callback for each visible service
@@ -347,6 +440,7 @@ async function initVisibility() {
 document.addEventListener('DOMContentLoaded', () => {
   initTheme()
   initVisibility()
+  initOrder()
   fetchData()
   document.getElementById('refresh').addEventListener('click', () => fetchData(true))
   document.getElementById('toggle').addEventListener('click', toggleTheme)

@@ -34,18 +34,21 @@
               </svg>
             </button>
             <div class="dropdown hidden" id="dropdown">
-              <label class="dropdown-item">
+              <div class="dropdown-item" data-provider="claude" draggable="true">
+                <span class="drag-handle">⠿</span>
                 <input type="checkbox" id="show-claude" checked />
                 <span>Claude</span>
-              </label>
-              <label class="dropdown-item">
+              </div>
+              <div class="dropdown-item" data-provider="codex" draggable="true">
+                <span class="drag-handle">⠿</span>
                 <input type="checkbox" id="show-codex" checked />
                 <span>Codex</span>
-              </label>
-              <label class="dropdown-item">
+              </div>
+              <div class="dropdown-item" data-provider="cursor" draggable="true">
+                <span class="drag-handle">⠿</span>
                 <input type="checkbox" id="show-cursor" checked />
                 <span>Cursor</span>
-              </label>
+              </div>
             </div>
           </div>
           <button class="toggle" id="toggle" title="Toggle theme">

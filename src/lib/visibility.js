@@ -1,4 +1,4 @@
-// Visibility configuration and helpers
+// Visibility and order configuration/helpers
 
 // Service visibility configuration
 export const SERVICES = [
@@ -6,6 +6,20 @@ export const SERVICES = [
   { key: 'showCodex', id: 'show-codex', name: 'codex' },
   { key: 'showCursor', id: 'show-cursor', name: 'cursor' },
 ]
+
+// Provider order constants
+export const ORDER_KEY = 'providerOrder'
+export const DEFAULT_ORDER = ['claude', 'codex', 'cursor']
+
+// Parse stored order, fallback to default
+export function parseOrder(result) {
+  const stored = result[ORDER_KEY]
+  const valid =
+    Array.isArray(stored) &&
+    stored.length === DEFAULT_ORDER.length &&
+    DEFAULT_ORDER.every((p) => stored.includes(p))
+  return valid ? [...stored] : [...DEFAULT_ORDER]
+}
 
 // Parse storage result into visibility map
 export function parseVisibility(result) {

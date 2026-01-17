@@ -1,6 +1,13 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { createChromeMock, clearMocks } from './mocks/chrome.js'
-import { parseVisibility, isAllHidden, SERVICES } from '../src/lib/visibility.js'
+import {
+  parseVisibility,
+  isAllHidden,
+  SERVICES,
+  ORDER_KEY,
+  DEFAULT_ORDER,
+  parseOrder,
+} from '../src/lib/visibility.js'
 
 // Setup global chrome mock
 const chrome = createChromeMock()
@@ -119,5 +126,89 @@ describe('Visibility - storage persistence', () => {
     const result = await chrome.storage.local.get(['showClaude', 'showCodex'])
     expect(result.showClaude).toBe(false)
     expect(result.showCodex).toBe(true)
+  })
+})
+
+describe('Order - constants', () => {
+  test('ORDER_KEY is providerOrder', () => {
+    expect(ORDER_KEY).toBe('providerOrder')
+  })
+
+  test('DEFAULT_ORDER has all providers', () => {
+    expect(DEFAULT_ORDER).toEqual(['claude', 'codex', 'cursor'])
+  })
+})
+
+describe('Order - parseOrder', () => {
+  test('returns default when not set', () => {
+    const order = parseOrder({})
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when not array', () => {
+    const order = parseOrder({ providerOrder: 'invalid' })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when missing provider', () => {
+    const order = parseOrder({ providerOrder: ['claude', 'codex'] })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when extra provider', () => {
+    const order = parseOrder({ providerOrder: ['claude', 'codex', 'cursor', 'extra'] })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when unknown provider', () => {
+    const order = parseOrder({ providerOrder: ['claude', 'codex', 'unknown'] })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns valid custom order', () => {
+    const order = parseOrder({ providerOrder: ['cursor', 'claude', 'codex'] })
+    expect(order).toEqual(['cursor', 'claude', 'codex'])
+  })
+
+  test('returns copy not reference', () => {
+    const stored = ['cursor', 'claude', 'codex']
+    const order = parseOrder({ providerOrder: stored })
+    order[0] = 'modified'
+    expect(stored[0]).toBe('cursor')
+  })
+
+  test('returns default when null', () => {
+    const order = parseOrder({ providerOrder: null })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when empty array', () => {
+    const order = parseOrder({ providerOrder: [] })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+
+  test('returns default when duplicates', () => {
+    const order = parseOrder({ providerOrder: ['claude', 'claude', 'codex'] })
+    expect(order).toEqual(['claude', 'codex', 'cursor'])
+  })
+})
+
+describe('Order - storage persistence', () => {
+  beforeEach(() => {
+    clearMocks()
+  })
+
+  test('persists providerOrder setting', async () => {
+    const order = ['cursor', 'claude', 'codex']
+    await chrome.storage.local.set({ providerOrder: order })
+    const result = await chrome.storage.local.get('providerOrder')
+    expect(result.providerOrder).toEqual(order)
+  })
+
+  test('retrieves order with parseOrder', async () => {
+    await chrome.storage.local.set({ providerOrder: ['codex', 'cursor', 'claude'] })
+    const result = await chrome.storage.local.get('providerOrder')
+    const order = parseOrder(result)
+    expect(order).toEqual(['codex', 'cursor', 'claude'])
   })
 })

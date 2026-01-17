@@ -2,5 +2,6 @@ node_modules/
 dist/
 build/
 coverage/
+icons/
 .claude/settings.local.json
 .husky/pre-commit

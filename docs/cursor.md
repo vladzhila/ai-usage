@@ -17,9 +17,10 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 | Endpoint                 | Returns                                         |
 | ------------------------ | ----------------------------------------------- |
 | `GET /api/usage-summary` | `membershipType`, `billingCycleEnd`, usage data |
-| `GET /api/auth/me`       | User `email`                                    |
+| `GET /api/auth/me`       | User `email`, `sub` (user ID)                   |
+| `GET /api/usage`         | Legacy request-based usage (gpt-4 requests)     |
 
-Both endpoints called in parallel.
+Primary endpoints called in parallel. Legacy endpoint used as fallback when `individualUsage` is missing.
 
 ## Plan Detection
 
@@ -32,8 +33,9 @@ Plan is detected from `membershipType` in usage response:
 | `hobby`      | Hobby      |
 | `team`       | Team       |
 | `enterprise` | Enterprise |
+| (legacy)     | Legacy     |
 
-Unknown types are title-cased. Fallback: "Cursor".
+Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `individualUsage` is missing.
 
 ## Usage Window
 
@@ -51,7 +53,40 @@ Unknown types are title-cased. Fallback: "Cursor".
 - Converted to dollars for internal tracking
 - Not currently displayed in popup UI
 
+## Usage Breakdown
+
+Auto vs API percentage breakdown (when available).
+
+- Field: `individualUsage.plan.autoPercentUsed` (0-1 float)
+- Field: `individualUsage.plan.apiPercentUsed` (0-1 float)
+- Converted to percentage (0-100%) for display
+- Only shown when values are present (not null/undefined)
+- Display: "AUTO X%" / "API Y%"
+
+## Team Usage
+
+Team on-demand spend tracking (for team accounts).
+
+- Field: `teamUsage.onDemand.used` (cents)
+- Field: `teamUsage.onDemand.limit` (cents, optional)
+- Converted to dollars for display
+- Only shown when `teamUsage.onDemand.used` is present
+- Display: "$X.XX / $Y.YY" or "$X.XX" (if no limit)
+
+## Legacy Plans
+
+Request-based usage for older Cursor plans.
+
+- Endpoint: `GET /api/usage?user={sub}` (fallback)
+- Triggered when `individualUsage` is missing from usage-summary
+- Field: `gpt-4.numRequests` - requests used
+- Field: `gpt-4.maxRequestUsage` - max requests (default 500)
+- Displayed as percentage + "X / Y" request count
+- Plan shows as "Legacy"
+
 ## Data Structure
+
+### Standard Response
 
 ```js
 {
@@ -63,6 +98,27 @@ Unknown types are title-cased. Fallback: "Cursor".
     reset: 'Unix-timestamp-ms',
     onDemand: 5.00,     // dollars (tracked, not displayed)
     email: 'user@example.com',
+    breakdown: { auto: 15, api: 10 },  // percentages, or { auto: null, api: null }
+    team: { used: 25.00, limit: 100.00 },  // dollars, or null
+  }
+}
+```
+
+### Legacy Response
+
+```js
+{
+  status: 'ok',
+  data: {
+    plan: 'Legacy',
+    used: 50,           // percentage (0-100)
+    limit: 100,
+    reset: null,
+    onDemand: 0,
+    email: 'user@example.com',
+    breakdown: { auto: null, api: null },
+    team: null,
+    legacy: { requests: 250, max: 500 },
   }
 }
 ```
@@ -77,16 +133,17 @@ Unknown types are title-cased. Fallback: "Cursor".
 
 ## Key Files
 
-- `src/background/service-worker.js` - `fetchCursorUsage()`, API URLs, error messages
-- `src/background/service-worker-core.js` - `fetchCursor()`, `parseCursorSummary()`, `formatCursorPlan()`, cookie config
-- `src/popup/popup.js` - `updateCard()` Cursor section (single window)
+- `src/background/service-worker.js` - `fetchCursorUsage()`, API URLs, legacy fallback
+- `src/background/service-worker-core.js` - `fetchCursor()`, `parseCursorSummary()`, `parseLegacyCursor()`, `formatCursorPlan()`
+- `src/popup/popup.js` - `updateCard()` Cursor section with breakdown/legacy/team
 - `src/popup/popup.html` - Cursor card template
-- `tests/service-worker.test.js` - Cursor API tests
+- `tests/service-worker.test.js` - Cursor API + `parseLegacyCursor()` + breakdown/team tests
 
 ## Limitations
 
-- **Single window only** - No per-model or session breakdown like Claude Max
 - **Percentage normalized** - Returns 0-100%, actual limits not exposed in UI
 - **Deeply nested API** - Usage at `usage.usage.individualUsage.plan.used`
-- **On-demand unused** - Tracked internally but not shown in popup
+- **On-demand unused** - Individual on-demand tracked but not shown in popup
 - **No hourly/daily granularity** - Only monthly billing cycle tracking
+- **Breakdown optional** - Auto/API split only available on some accounts
+- **Legacy detection** - Relies on missing `individualUsage` to trigger fallback

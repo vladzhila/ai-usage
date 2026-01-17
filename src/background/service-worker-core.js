@@ -4,14 +4,6 @@ export const CACHE_KEY = 'usage_cache'
 export const CACHE_TTL = 60000 // 1 minute
 export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
-const CURSOR_DEFAULT_PLAN = 'Cursor'
-const CURSOR_PLAN_LABELS = {
-  free: 'Free',
-  enterprise: 'Enterprise',
-  pro: 'Pro',
-  hobby: 'Hobby',
-  team: 'Team',
-}
 const CURSOR_DATA_ERROR = 'No Cursor data'
 const PERCENT_MAX = 100
 const CENTS_PER_DOLLAR = 100
@@ -22,6 +14,52 @@ const CLAUDE_PLAN_LABELS = {
   claude_pro: 'Pro',
   claude_team: 'Team',
   claude_enterprise: 'Enterprise',
+}
+
+// ChatGPT/Codex plan mapping
+const CODEX_PLAN_LABELS = {
+  guest: 'Guest',
+  free: 'Free',
+  go: 'Go',
+  plus: 'Plus',
+  pro: 'Pro',
+  free_workspace: 'Free Workspace',
+  team: 'Team',
+  business: 'Business',
+  education: 'Education',
+  quorum: 'Quorum',
+  k12: 'K-12',
+  enterprise: 'Enterprise',
+  edu: 'Education',
+}
+
+// Cursor plan mapping
+const CURSOR_PLAN_LABELS = {
+  free: 'Free',
+  enterprise: 'Enterprise',
+  pro: 'Pro',
+  hobby: 'Hobby',
+  team: 'Team',
+}
+
+// Shared plan formatter
+function formatPlan(type, labels, fallback) {
+  if (!type) {
+    return fallback
+  }
+  const key = String(type).trim().toLowerCase()
+  if (!key) {
+    return fallback
+  }
+  return labels[key] || `${key.charAt(0).toUpperCase()}${key.slice(1)}`
+}
+
+export function formatCodexPlan(type) {
+  return formatPlan(type, CODEX_PLAN_LABELS, 'Free')
+}
+
+function formatCursorPlan(type) {
+  return formatPlan(type, CURSOR_PLAN_LABELS, 'Cursor')
 }
 
 export const SERVICES = {
@@ -187,21 +225,6 @@ export async function fetchClaude() {
   }
 }
 
-function formatCursorPlan(type) {
-  if (!type) {
-    return CURSOR_DEFAULT_PLAN
-  }
-
-  const normalized = String(type).trim().toLowerCase()
-  if (!normalized) {
-    return CURSOR_DEFAULT_PLAN
-  }
-
-  return (
-    CURSOR_PLAN_LABELS[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`
-  )
-}
-
 function toPercent(used, limit) {
   if (!limit || limit <= 0) {
     return 0
@@ -226,11 +249,11 @@ function parseCursorSummary(payload) {
   const summary = usage?.usage || usage
   const individual = summary?.individualUsage || {}
   const plan = individual?.plan || {}
-  const breakdown = plan?.breakdown || {}
+  const planBreakdown = plan?.breakdown || {}
   const onDemand = individual?.onDemand || {}
 
   const planUsedRaw = Number(plan.used || 0)
-  const planLimitRaw = Number(breakdown.total ?? plan.limit ?? 0)
+  const planLimitRaw = Number(planBreakdown.total ?? plan.limit ?? 0)
   const percent = toPercent(planUsedRaw, planLimitRaw)
 
   const onDemandUsedRaw = Number(onDemand.used || 0)
@@ -239,15 +262,65 @@ function parseCursorSummary(payload) {
   const cycleEnd = summary?.billingCycleEnd
   const reset = cycleEnd ? Date.parse(cycleEnd) : null
 
+  // Percentage breakdown (auto vs api)
+  const autoPercent = plan.autoPercentUsed
+  const apiPercent = plan.apiPercentUsed
+
+  // Team on-demand usage
+  const teamOnDemand = summary?.teamUsage?.onDemand || {}
+  const hasTeam = teamOnDemand.used !== null && teamOnDemand.used !== undefined
+
   return {
     status: 'ok',
     data: {
       plan: formatCursorPlan(summary?.membershipType),
       used: percent,
-      limit: 100,
+      limit: PERCENT_MAX,
       reset: Number.isNaN(reset) ? null : reset,
       onDemand: onDemandUsed,
       email: user?.email || null,
+      breakdown: {
+        auto:
+          autoPercent !== null && autoPercent !== undefined
+            ? Math.round(autoPercent * PERCENT_MAX)
+            : null,
+        api:
+          apiPercent !== null && apiPercent !== undefined
+            ? Math.round(apiPercent * PERCENT_MAX)
+            : null,
+      },
+      team: hasTeam
+        ? {
+            used: teamOnDemand.used / CENTS_PER_DOLLAR,
+            limit: teamOnDemand.limit ? teamOnDemand.limit / CENTS_PER_DOLLAR : null,
+          }
+        : null,
+    },
+  }
+}
+
+export function parseLegacyCursor(data, user) {
+  if (!data) {
+    return { status: 'error', message: CURSOR_DATA_ERROR }
+  }
+
+  const gpt4 = data['gpt-4'] || {}
+  const used = gpt4.numRequests || 0
+  const max = gpt4.maxRequestUsage || 500
+  const percent = toPercent(used, max)
+
+  return {
+    status: 'ok',
+    data: {
+      plan: 'Legacy',
+      used: percent,
+      limit: PERCENT_MAX,
+      reset: null,
+      onDemand: 0,
+      email: user?.email || null,
+      breakdown: { auto: null, api: null },
+      team: null,
+      legacy: { requests: used, max },
     },
   }
 }

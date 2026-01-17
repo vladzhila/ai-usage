@@ -25,6 +25,8 @@ import {
   isCacheValid,
   fetchClaude,
   fetchCursor,
+  formatCodexPlan,
+  parseLegacyCursor,
 } from '../src/background/service-worker-core.js'
 
 describe('SERVICES config', () => {
@@ -493,5 +495,190 @@ describe('fetchCursor', () => {
     expect(result.data.used).toBe(25)
     expect(result.data.limit).toBe(100)
     expect(result.data.reset).toBe(Date.parse('2026-01-20T14:05:00Z'))
+  })
+
+  test('returns breakdown data when present', () => {
+    const usageWithBreakdown = {
+      ...CURSOR_USAGE_RESPONSE,
+      individualUsage: {
+        ...CURSOR_USAGE_RESPONSE.individualUsage,
+        plan: {
+          ...CURSOR_USAGE_RESPONSE.individualUsage.plan,
+          autoPercentUsed: 0.15,
+          apiPercentUsed: 0.1,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithBreakdown,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.breakdown.auto).toBe(15)
+    expect(result.data.breakdown.api).toBe(10)
+  })
+
+  test('returns null breakdown when not present', () => {
+    const result = fetchCursor({
+      usage: CURSOR_USAGE_RESPONSE,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.data.breakdown.auto).toBeNull()
+    expect(result.data.breakdown.api).toBeNull()
+  })
+
+  test('returns team usage when present', () => {
+    const usageWithTeam = {
+      ...CURSOR_USAGE_RESPONSE,
+      teamUsage: {
+        onDemand: {
+          used: 1500,
+          limit: 5000,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithTeam,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.team).toBeDefined()
+    expect(result.data.team.used).toBe(15)
+    expect(result.data.team.limit).toBe(50)
+  })
+
+  test('returns team without limit when limit not set', () => {
+    const usageWithTeamNoLimit = {
+      ...CURSOR_USAGE_RESPONSE,
+      teamUsage: {
+        onDemand: {
+          used: 2000,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithTeamNoLimit,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.data.team.used).toBe(20)
+    expect(result.data.team.limit).toBeNull()
+  })
+
+  test('returns null team when not present', () => {
+    const result = fetchCursor({
+      usage: CURSOR_USAGE_RESPONSE,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.data.team).toBeNull()
+  })
+})
+
+describe('formatCodexPlan', () => {
+  test('returns Free for null/undefined', () => {
+    expect(formatCodexPlan(null)).toBe('Free')
+    expect(formatCodexPlan(undefined)).toBe('Free')
+    expect(formatCodexPlan('')).toBe('Free')
+  })
+
+  test('maps known plan types correctly', () => {
+    expect(formatCodexPlan('guest')).toBe('Guest')
+    expect(formatCodexPlan('free')).toBe('Free')
+    expect(formatCodexPlan('go')).toBe('Go')
+    expect(formatCodexPlan('plus')).toBe('Plus')
+    expect(formatCodexPlan('pro')).toBe('Pro')
+    expect(formatCodexPlan('free_workspace')).toBe('Free Workspace')
+    expect(formatCodexPlan('team')).toBe('Team')
+    expect(formatCodexPlan('business')).toBe('Business')
+    expect(formatCodexPlan('education')).toBe('Education')
+    expect(formatCodexPlan('quorum')).toBe('Quorum')
+    expect(formatCodexPlan('k12')).toBe('K-12')
+    expect(formatCodexPlan('enterprise')).toBe('Enterprise')
+    expect(formatCodexPlan('edu')).toBe('Education')
+  })
+
+  test('handles case insensitivity', () => {
+    expect(formatCodexPlan('PLUS')).toBe('Plus')
+    expect(formatCodexPlan('Plus')).toBe('Plus')
+    expect(formatCodexPlan('PRO')).toBe('Pro')
+    expect(formatCodexPlan('TEAM')).toBe('Team')
+  })
+
+  test('handles whitespace', () => {
+    expect(formatCodexPlan('  plus  ')).toBe('Plus')
+    expect(formatCodexPlan(' pro ')).toBe('Pro')
+  })
+
+  test('capitalizes unknown plan types', () => {
+    expect(formatCodexPlan('unknown')).toBe('Unknown')
+    expect(formatCodexPlan('custom')).toBe('Custom')
+    expect(formatCodexPlan('newplan')).toBe('Newplan')
+  })
+})
+
+describe('parseLegacyCursor', () => {
+  test('returns error for null data', () => {
+    const result = parseLegacyCursor(null, {})
+    expect(result.status).toBe('error')
+  })
+
+  test('parses gpt-4 request data', () => {
+    const data = {
+      'gpt-4': {
+        numRequests: 250,
+        maxRequestUsage: 500,
+      },
+    }
+    const user = { email: 'test@example.com' }
+
+    const result = parseLegacyCursor(data, user)
+
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Legacy')
+    expect(result.data.used).toBe(50)
+    expect(result.data.limit).toBe(100)
+    expect(result.data.legacy.requests).toBe(250)
+    expect(result.data.legacy.max).toBe(500)
+    expect(result.data.email).toBe('test@example.com')
+  })
+
+  test('handles missing gpt-4 data', () => {
+    const result = parseLegacyCursor({}, { email: 'user@test.com' })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.used).toBe(0)
+    expect(result.data.legacy.requests).toBe(0)
+    expect(result.data.legacy.max).toBe(500)
+  })
+
+  test('calculates percentage correctly', () => {
+    const data = {
+      'gpt-4': {
+        numRequests: 100,
+        maxRequestUsage: 1000,
+      },
+    }
+
+    const result = parseLegacyCursor(data, {})
+    expect(result.data.used).toBe(10)
+  })
+
+  test('caps percentage at 100', () => {
+    const data = {
+      'gpt-4': {
+        numRequests: 600,
+        maxRequestUsage: 500,
+      },
+    }
+
+    const result = parseLegacyCursor(data, {})
+    expect(result.data.used).toBe(100)
   })
 })

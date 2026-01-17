@@ -20,17 +20,12 @@ function getTheme() {
 // Save and apply theme
 function setTheme(theme) {
   chrome.storage.local.set({ [THEME_KEY]: theme })
-  if (theme === DARK) {
-    document.body.classList.add(DARK)
-  } else {
-    document.body.classList.remove(DARK)
-  }
+  document.body.classList.toggle(DARK, theme === DARK)
 }
 
 // Toggle between themes
 function toggleTheme() {
-  const current = document.body.classList.contains(DARK) ? DARK : LIGHT
-  const next = current === DARK ? LIGHT : DARK
+  const next = document.body.classList.contains(DARK) ? LIGHT : DARK
   setTheme(next)
 }
 
@@ -314,15 +309,23 @@ function updateCard(service, result) {
     return
   }
 
-  // Codex: dual windows (session + weekly)
+  // Codex: dual windows (session + weekly) + credits
   if (service === 'codex') {
-    const { session = {}, weekly = {} } = data
+    const { session = {}, weekly = {}, credits = {} } = data
     updateWindow(card, 'session', session, formatReset)
     updateWindow(card, 'weekly', weekly, formatWeeklyReset)
+
+    // Credits section
+    const hasCredits = credits.has || credits.unlimited || credits.balance > 0
+    showSection(card, 'credits', hasCredits)
+    if (hasCredits) {
+      const display = credits.unlimited ? 'Unlimited' : `$${credits.balance.toFixed(2)}`
+      setField(card, 'credits-display', display)
+    }
     return
   }
 
-  // Cursor: single window
+  // Cursor: single window + breakdown/legacy/team
   const used = data.used || 0
   const limit = data.limit || 0
   const percent = getUsagePercent(used, limit)
@@ -330,6 +333,37 @@ function updateCard(service, result) {
   setField(card, 'usage', percent)
   updateBar(card, 'bar', percent)
   setField(card, 'reset', formatWeeklyReset(data.reset))
+
+  // Breakdown section
+  const breakdown = data.breakdown || {}
+  const hasBreakdown = breakdown.auto !== null || breakdown.api !== null
+  showSection(card, 'breakdown', hasBreakdown)
+  if (hasBreakdown) {
+    setField(card, 'auto-percent', breakdown.auto ?? 0)
+    setField(card, 'api-percent', breakdown.api ?? 0)
+  }
+
+  // Legacy section
+  const legacy = data.legacy
+  showSection(card, 'legacy', Boolean(legacy))
+  if (legacy) {
+    setField(card, 'requests', legacy.requests)
+    setField(card, 'max-requests', legacy.max)
+  }
+
+  // Team section
+  const team = data.team
+  showSection(card, 'team', Boolean(team))
+  if (team) {
+    setField(card, 'team-used', team.used.toFixed(2))
+    const limitWrap = card.querySelector('[data-field="team-limit-wrap"]')
+    if (limitWrap) {
+      limitWrap.style.display = team.limit ? '' : 'none'
+    }
+    if (team.limit) {
+      setField(card, 'team-limit', team.limit.toFixed(2))
+    }
+  }
 }
 
 const SPIN_DELAY_MS = 300
@@ -342,15 +376,8 @@ function setNotice(message) {
   if (!notice) {
     return
   }
-
-  if (!message) {
-    notice.textContent = ''
-    notice.classList.add('hidden')
-    return
-  }
-
-  notice.textContent = message
-  notice.classList.remove('hidden')
+  notice.textContent = message || ''
+  notice.classList.toggle('hidden', !message)
 }
 
 function setError(service, message) {

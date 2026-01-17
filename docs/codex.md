@@ -23,14 +23,26 @@ The usage endpoint requires `Authorization: Bearer ${accessToken}` header.
 
 ## Plan Detection
 
-Plan is detected from `plan_type` in usage response:
+Plan is detected from `plan_type` in usage response via `formatCodexPlan()`:
 
-| Value   | Display |
-| ------- | ------- |
-| `Plus`  | Plus    |
-| (empty) | Free    |
+| Value            | Display        |
+| ---------------- | -------------- |
+| `guest`          | Guest          |
+| `free`           | Free           |
+| `go`             | Go             |
+| `plus`           | Plus           |
+| `pro`            | Pro            |
+| `free_workspace` | Free Workspace |
+| `team`           | Team           |
+| `business`       | Business       |
+| `education`      | Education      |
+| `quorum`         | Quorum         |
+| `k12`            | K-12           |
+| `enterprise`     | Enterprise     |
+| `edu`            | Education      |
+| (empty/null)     | Free           |
 
-No tier mapping - uses API value directly.
+Unknown types are title-cased.
 
 ## Usage Windows
 
@@ -46,15 +58,27 @@ No tier mapping - uses API value directly.
 - Usage: `used_percent` (0-100%)
 - Reset: `reset_at` (Unix timestamp in seconds, converted to ms)
 
+## Credits
+
+API credits for additional usage beyond subscription limits.
+
+- Field: `credits` object in usage response
+- `has_credits` - boolean, whether credits are available
+- `unlimited` - boolean, unlimited credits enabled
+- `balance` - number, current credit balance in dollars
+- Displayed as "$X.XX" or "Unlimited"
+- Only shown when `has_credits`, `unlimited`, or `balance > 0`
+
 ## Data Structure
 
 ```js
 {
   status: 'ok',
   data: {
-    plan: 'Plus' | 'Free',
+    plan: 'Plus' | 'Pro' | 'Team' | 'Business' | 'Enterprise' | 'Free' | ...,
     session: { used: 45, reset: 'Unix-timestamp-ms' },
     weekly: { used: 30, reset: 'Unix-timestamp-ms' },
+    credits: { has: true, unlimited: false, balance: 10.50 },
   }
 }
 ```
@@ -69,12 +93,12 @@ No tier mapping - uses API value directly.
 
 ## Key Files
 
-- `src/background/service-worker.js` - `fetchCodex()`, API URLs, error messages
-- `src/background/service-worker-core.js` - `getCookie()`, `isValid()`, cookie config
-- `src/popup/popup.js` - `updateCard()` Codex section with dual windows
+- `src/background/service-worker.js` - `fetchCodex()`, API URLs, credits parsing
+- `src/background/service-worker-core.js` - `formatCodexPlan()`, `getCookie()`, `isValid()`, cookie config
+- `src/popup/popup.js` - `updateCard()` Codex section with dual windows + credits
 - `src/popup/popup.html` - Codex card template
 - `src/lib/constants.js` - `CHATGPT_SESSION_WINDOW_MS` (3 hours)
-- `tests/service-worker.test.js` - Codex API tests
+- `tests/service-worker.test.js` - Codex API + `formatCodexPlan()` tests
 
 ## Limitations
 

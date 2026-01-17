@@ -8,6 +8,8 @@ import {
   isCacheValid,
   fetchClaude,
   fetchCursor,
+  formatCodexPlan,
+  parseLegacyCursor,
 } from './service-worker-core.js'
 
 const CHATGPT_URL = 'https://chatgpt.com'
@@ -15,6 +17,7 @@ const CHATGPT_SESSION_URL = `${CHATGPT_URL}/api/auth/session`
 const CHATGPT_USAGE_URL = `${CHATGPT_URL}/backend-api/wham/usage`
 const CURSOR_USAGE_URL = 'https://cursor.com/api/usage-summary'
 const CURSOR_USER_URL = 'https://cursor.com/api/auth/me'
+const CURSOR_LEGACY_URL = 'https://cursor.com/api/usage'
 const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
 const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
 const CODEX_TOKEN_MESSAGE = 'No access token in session'
@@ -64,11 +67,12 @@ async function fetchCodex() {
     const data = await usage.json()
     const primary = data.rate_limit?.primary_window
     const secondary = data.rate_limit?.secondary_window
+    const credits = data.credits || {}
 
     return {
       status: 'ok',
       data: {
-        plan: data.plan_type || 'Free',
+        plan: formatCodexPlan(data.plan_type),
         session: {
           used: primary?.used_percent || 0,
           reset: primary?.reset_at ? primary.reset_at * 1000 : null,
@@ -76,6 +80,11 @@ async function fetchCodex() {
         weekly: {
           used: secondary?.used_percent || 0,
           reset: secondary?.reset_at ? secondary.reset_at * 1000 : null,
+        },
+        credits: {
+          has: Boolean(credits.has_credits),
+          unlimited: Boolean(credits.unlimited),
+          balance: parseFloat(credits.balance) || 0,
         },
       },
     }
@@ -111,6 +120,18 @@ async function fetchCursorUsage() {
 
     const usageData = await usage.json()
     const userData = await user.json()
+
+    // Check for legacy plan (no individualUsage)
+    if (!usageData?.individualUsage && userData?.sub) {
+      const legacy = await fetch(`${CURSOR_LEGACY_URL}?user=${userData.sub}`, {
+        credentials: 'include',
+      })
+      if (legacy.ok) {
+        const legacyData = await legacy.json()
+        return parseLegacyCursor(legacyData, userData)
+      }
+    }
+
     return fetchCursor({ usage: usageData, user: userData })
   } catch {
     return { status: 'error', message: 'Refresh cursor.com tab' }
@@ -124,21 +145,13 @@ function isFailure(result) {
 }
 
 function normalizeResult(result) {
-  if (result.status === 'fulfilled') {
-    return result.value
-  }
-
-  return { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+  return result.status === 'fulfilled'
+    ? result.value
+    : { status: 'error', message: FALLBACK_ERROR_MESSAGE }
 }
 
 function hasFailure(results) {
-  return results.some((result) => {
-    if (result.status === 'rejected') {
-      return true
-    }
-
-    return isFailure(result.value)
-  })
+  return results.some((r) => r.status === 'rejected' || isFailure(r.value))
 }
 
 const HIDDEN_RESULT = { status: 'hidden' }
@@ -164,25 +177,14 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true,
   const result = { claude, codex, cursor }
 
   // Only cache if we fetched visible providers and they succeeded
-  const visibleResults = results.filter((_, i) => {
-    if (i === 0) {
-      return visibility.claude
-    }
-    if (i === 1) {
-      return visibility.codex
-    }
-    return visibility.cursor
-  })
+  const providers = ['claude', 'codex', 'cursor']
+  const visibleResults = results.filter((_, i) => visibility[providers[i]])
   if (visibleResults.length > 0 && !hasFailure(visibleResults)) {
-    const cacheData = { ...cache }
-    if (visibility.claude) {
-      cacheData.claude = claude
-    }
-    if (visibility.codex) {
-      cacheData.codex = codex
-    }
-    if (visibility.cursor) {
-      cacheData.cursor = cursor
+    const cacheData = {
+      ...cache,
+      ...(visibility.claude && { claude }),
+      ...(visibility.codex && { codex }),
+      ...(visibility.cursor && { cursor }),
     }
     await setCache(cacheData)
     return result

@@ -19,11 +19,11 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 | `GET /api/organizations`                          | Organization UUID                                                      |
 | `GET /api/organizations/{id}/usage`               | `five_hour`, `seven_day`, `seven_day_opus`, `seven_day_sonnet` windows |
 | `GET /api/organizations/{id}/overage_spend_limit` | Extra usage: `is_enabled`, `used_credits`, `monthly_credit_limit`      |
-| `GET /api/account`                                | `rate_limit_tier` for plan detection                                   |
+| `GET /api/account`                                | `rate_limit_tier`, `billing_type` for plan detection                   |
 
 ## Plan Detection
 
-Plan is detected from `rate_limit_tier` in account response:
+Plan is detected from `rate_limit_tier` in account response, with a billing fallback:
 
 | Tier                | Display    |
 | ------------------- | ---------- |
@@ -31,8 +31,12 @@ Plan is detected from `rate_limit_tier` in account response:
 | `claude_pro`        | Pro        |
 | `claude_team`       | Team       |
 | `claude_enterprise` | Enterprise |
+| `claude_ultra`      | Ultra      |
 
-Fallback: checks `capabilities` array for `claude_pro` capability.
+Fallbacks:
+
+- If `rate_limit_tier` is missing and `billing_type` indicates paid (e.g., `stripe`), assume Pro.
+- If billing info is missing, checks `capabilities` array for `claude_pro` capability.
 
 ## Usage Windows
 
@@ -75,7 +79,7 @@ Shows additional spend beyond subscription limits.
 {
   status: 'ok',
   data: {
-    plan: 'Max' | 'Pro' | 'Team' | 'Enterprise' | 'Free',
+    plan: 'Max' | 'Pro' | 'Team' | 'Enterprise' | 'Ultra' | 'Free',
     fiveHour: { used: 45, reset: 'ISO-timestamp' },
     weekly: { used: 30, reset: 'ISO-timestamp' },    // Max only, null otherwise
     opus: { used: 20, reset: 'ISO-timestamp' },      // Max only, null otherwise

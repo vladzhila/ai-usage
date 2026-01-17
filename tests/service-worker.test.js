@@ -207,7 +207,7 @@ function createClaudeMock(options = {}) {
   const {
     org = { uuid: 'org-123', capabilities: ['claude_pro'] },
     usage = { five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } },
-    account = { rate_limit_tier: 'claude_pro' },
+    account = { rate_limit_tier: 'claude_pro', billing_type: null },
     overage = { is_enabled: false },
     accountFails = false,
     overageFails = false,
@@ -400,7 +400,7 @@ describe('fetchClaude', () => {
 
     mockFetch.mockImplementation(
       createClaudeMock({
-        account: { rate_limit_tier: 'claude_team' },
+        account: { rate_limit_tier: 'claude_team', billing_type: null },
         usage: { five_hour: { utilization: 30 } },
       })
     )
@@ -410,12 +410,43 @@ describe('fetchClaude', () => {
     expect(result.data.plan).toBe('Team')
   })
 
+  test('returns Ultra plan from rate_limit_tier', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_ultra', billing_type: null },
+        usage: { five_hour: { utilization: 12 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Ultra')
+  })
+
+  test('returns Pro plan when billing_type indicates paid', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { billing_type: 'stripe', rate_limit_tier: null },
+        org: { uuid: 'org-123', capabilities: [] },
+        usage: { five_hour: { utilization: 22 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro')
+  })
+
   test('returns Enterprise plan from rate_limit_tier', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 
     mockFetch.mockImplementation(
       createClaudeMock({
-        account: { rate_limit_tier: 'claude_enterprise' },
+        account: { rate_limit_tier: 'claude_enterprise', billing_type: null },
         usage: { five_hour: { utilization: 15 } },
       })
     )

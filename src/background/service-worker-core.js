@@ -14,6 +14,7 @@ const CLAUDE_PLAN_LABELS = {
   claude_pro: 'Pro',
   claude_team: 'Team',
   claude_enterprise: 'Enterprise',
+  claude_ultra: 'Ultra',
 }
 
 // ChatGPT/Codex plan mapping
@@ -165,8 +166,21 @@ function parseOverage(data) {
 // Detect Claude plan from rate_limit_tier or capabilities
 function detectPlan(account, org) {
   const tier = account?.rate_limit_tier
-  if (tier && CLAUDE_PLAN_LABELS[tier]) {
-    return CLAUDE_PLAN_LABELS[tier]
+  const normalizedTier = tier ? String(tier).toLowerCase() : ''
+  if (normalizedTier) {
+    const known = CLAUDE_PLAN_LABELS[normalizedTier]
+    if (known) {
+      return known
+    }
+    if (normalizedTier.includes('ultra')) {
+      return 'Ultra'
+    }
+  }
+
+  const billing = account?.billing_type ? String(account.billing_type).toLowerCase() : ''
+  const hasTier = normalizedTier.length > 0
+  if (billing.includes('stripe') && (!hasTier || normalizedTier.includes('claude'))) {
+    return 'Pro'
   }
 
   // Fallback to capabilities check

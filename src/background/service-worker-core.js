@@ -16,6 +16,14 @@ const CURSOR_DATA_ERROR = 'No Cursor data'
 const PERCENT_MAX = 100
 const CENTS_PER_DOLLAR = 100
 
+// Claude plan mapping from rate_limit_tier
+const CLAUDE_PLAN_LABELS = {
+  claude_max: 'Max',
+  claude_pro: 'Pro',
+  claude_team: 'Team',
+  claude_enterprise: 'Enterprise',
+}
+
 export const SERVICES = {
   claude: {
     url: 'https://claude.ai',
@@ -95,6 +103,42 @@ export function isCacheValid(cache) {
   return Date.now() - cache.timestamp < CACHE_TTL
 }
 
+// Parse usage window (five_hour, seven_day, etc.)
+function parseWindow(window) {
+  if (!window) {
+    return null
+  }
+  return {
+    used: window.utilization || 0,
+    reset: window.resets_at || null,
+  }
+}
+
+// Parse overage spend data (cents → dollars)
+function parseOverage(data) {
+  const enabled = Boolean(data?.is_enabled)
+  return {
+    enabled,
+    used: enabled ? (data.used_credits || 0) / CENTS_PER_DOLLAR : 0,
+    limit: enabled ? (data.monthly_credit_limit || 0) / CENTS_PER_DOLLAR : 0,
+  }
+}
+
+// Detect Claude plan from rate_limit_tier or capabilities
+function detectPlan(account, org) {
+  const tier = account?.rate_limit_tier
+  if (tier && CLAUDE_PLAN_LABELS[tier]) {
+    return CLAUDE_PLAN_LABELS[tier]
+  }
+
+  // Fallback to capabilities check
+  const caps = org?.capabilities || []
+  if (caps.includes('claude_pro')) {
+    return 'Pro'
+  }
+  return 'Free'
+}
+
 export async function fetchClaude() {
   const cookie = await getCookie('claude')
 
@@ -112,21 +156,33 @@ export async function fetchClaude() {
     return { status: 'error', message: 'No organization found' }
   }
 
-  const usage = await fetchJson(`https://claude.ai/api/organizations/${org.uuid}/usage`)
+  const baseUrl = `https://claude.ai/api/organizations/${org.uuid}`
+
+  // Parallel fetch: usage, overage, account
+  const [usage, overage, account] = await Promise.all([
+    fetchJson(`${baseUrl}/usage`),
+    fetchJson(`${baseUrl}/overage_spend_limit`),
+    fetchJson('https://claude.ai/api/account'),
+  ])
+
+  // Usage is required
   if (usage.status !== 'ok') {
     return usage
   }
 
-  const isPro = org.capabilities?.includes('claude_pro')
-  const fiveHour = usage.data?.five_hour
+  const plan = detectPlan(account.data, org)
+  const isMax = plan === 'Max'
+  const windows = usage.data || {}
 
   return {
     status: 'ok',
     data: {
-      plan: isPro ? 'Pro' : 'Free',
-      used: fiveHour?.utilization || 0,
-      limit: 100,
-      reset: fiveHour?.resets_at || null,
+      plan,
+      fiveHour: parseWindow(windows.five_hour),
+      weekly: isMax ? parseWindow(windows.seven_day) : null,
+      opus: isMax ? parseWindow(windows.seven_day_opus) : null,
+      sonnet: isMax ? parseWindow(windows.seven_day_sonnet) : null,
+      extra: parseOverage(overage.data),
     },
   }
 }

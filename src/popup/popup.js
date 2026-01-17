@@ -150,6 +150,26 @@ function setField(card, field, value) {
   }
 }
 
+// Show/hide a section element
+function showSection(card, name, visible) {
+  const section = card.querySelector(`[data-section="${name}"]`)
+  if (section) {
+    section.style.display = visible ? 'block' : 'none'
+  }
+}
+
+// Update a usage window section (used %, bar, reset)
+function updateWindow(card, prefix, window, formatter) {
+  setField(card, `${prefix}-used`, window.used || 0)
+  updateBar(card, `${prefix}-bar`, window.used || 0)
+  setField(card, `${prefix}-reset`, formatter(window.reset))
+}
+
+// Format dollar amount with 2 decimal places
+function formatDollars(amount) {
+  return (amount || 0).toFixed(2)
+}
+
 // Update card with data
 function updateCard(service, result) {
   const card = document.querySelector(`[data-service="${service}"]`)
@@ -172,35 +192,51 @@ function updateCard(service, result) {
 
   setField(card, 'plan', data.plan || 'Unknown')
 
-  // Codex: dual windows (session + weekly)
-  if (service === 'codex') {
-    const session = data.session || {}
-    const weekly = data.weekly || {}
+  // Claude: multi-window (session + weekly/opus for Max + extra)
+  if (service === 'claude') {
+    const { fiveHour, weekly, opus, extra = {} } = data
 
-    setField(card, 'session-used', session.used || 0)
-    updateBar(card, 'session-bar', session.used || 0)
-    setField(card, 'session-reset', formatReset(session.reset))
+    // Session window (always shown)
+    if (fiveHour) {
+      updateWindow(card, 'session', fiveHour, formatReset)
+    }
 
-    setField(card, 'weekly-used', weekly.used || 0)
-    updateBar(card, 'weekly-bar', weekly.used || 0)
-    setField(card, 'weekly-reset', formatWeeklyReset(weekly.reset))
+    // Weekly/Opus sections (Max only)
+    showSection(card, 'weekly', weekly)
+    if (weekly) {
+      updateWindow(card, 'weekly', weekly, formatWeeklyReset)
+    }
+
+    showSection(card, 'opus', opus)
+    if (opus) {
+      updateWindow(card, 'opus', opus, formatWeeklyReset)
+    }
+
+    // Extra spend section
+    showSection(card, 'extra', extra.enabled)
+    if (extra.enabled) {
+      setField(card, 'extra-used', formatDollars(extra.used))
+      setField(card, 'extra-limit', formatDollars(extra.limit))
+    }
     return
   }
 
-  // Claude + Cursor: single window
+  // Codex: dual windows (session + weekly)
+  if (service === 'codex') {
+    const { session = {}, weekly = {} } = data
+    updateWindow(card, 'session', session, formatReset)
+    updateWindow(card, 'weekly', weekly, formatWeeklyReset)
+    return
+  }
+
+  // Cursor: single window
   const used = data.used || 0
   const limit = data.limit || 0
   const percent = getUsagePercent(used, limit)
 
   setField(card, 'usage', percent)
   updateBar(card, 'bar', percent)
-
-  if (service === 'cursor') {
-    setField(card, 'reset', formatWeeklyReset(data.reset))
-    return
-  }
-
-  setField(card, 'reset', formatReset(data.reset))
+  setField(card, 'reset', formatWeeklyReset(data.reset))
 }
 
 const SPIN_DELAY_MS = 300

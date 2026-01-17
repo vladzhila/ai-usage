@@ -119,15 +119,51 @@
               <span class="badge" data-field="plan">Pro</span>
             </div>
             <div class="row">
-              <span class="label">USAGE</span>
-              <span class="value"><span data-field="usage">0</span>%</span>
+              <span class="label">SESSION</span>
+              <span class="value"><span data-field="session-used">0</span>%</span>
             </div>
             <div class="progress">
-              <div class="bar" data-field="bar" style="width: 0%"></div>
+              <div class="bar" data-field="session-bar" style="width: 0%"></div>
             </div>
-            <div class="row">
+            <div class="row row-sub">
               <span class="label">RESETS</span>
-              <span class="muted" data-field="reset">--</span>
+              <span class="muted" data-field="session-reset">--</span>
+            </div>
+            <div class="section" data-section="weekly" style="display: none">
+              <div class="row">
+                <span class="label">WEEKLY</span>
+                <span class="value"><span data-field="weekly-used">0</span>%</span>
+              </div>
+              <div class="progress">
+                <div class="bar" data-field="weekly-bar" style="width: 0%"></div>
+              </div>
+              <div class="row row-sub">
+                <span class="label">RESETS</span>
+                <span class="muted" data-field="weekly-reset">--</span>
+              </div>
+            </div>
+            <div class="section" data-section="opus" style="display: none">
+              <div class="row">
+                <span class="label">OPUS</span>
+                <span class="value"><span data-field="opus-used">0</span>%</span>
+              </div>
+              <div class="progress">
+                <div class="bar" data-field="opus-bar" style="width: 0%"></div>
+              </div>
+              <div class="row row-sub">
+                <span class="label">RESETS</span>
+                <span class="muted" data-field="opus-reset">--</span>
+              </div>
+            </div>
+            <div class="section" data-section="extra" style="display: none">
+              <div class="row">
+                <span class="label">EXTRA</span>
+                <span class="value"
+                  >$<span data-field="extra-used">0</span> / $<span data-field="extra-limit"
+                    >0</span
+                  ></span
+                >
+              </div>
             </div>
           </div>
         </article>

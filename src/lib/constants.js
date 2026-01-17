@@ -32,6 +32,15 @@ export const STORAGE_KEYS = {
 export const THRESHOLD_WARNING = 0.5 // 50% - yellow
 export const THRESHOLD_DANGER = 0.8 // 80% - red
 
+// Claude plan mapping from API tier to display name
+export const CLAUDE_PLANS = {
+  claude_max: 'Max',
+  claude_pro: 'Pro',
+  claude_team: 'Team',
+  claude_enterprise: 'Enterprise',
+  free: 'Free',
+}
+
 // Default data structure
 export const createDefaultUsageData = () => ({
   [STORAGE_KEYS.CHATGPT]: {

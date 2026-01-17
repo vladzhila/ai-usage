@@ -200,6 +200,56 @@ describe('fetchJson', () => {
   })
 })
 
+// Helper to create mock fetch for Claude API
+function createClaudeMock(options = {}) {
+  const {
+    org = { uuid: 'org-123', capabilities: ['claude_pro'] },
+    usage = { five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } },
+    account = { rate_limit_tier: 'claude_pro' },
+    overage = { is_enabled: false },
+    accountFails = false,
+    overageFails = false,
+  } = options
+
+  return (url) => {
+    if (url.includes('/organizations') && !url.includes('/usage') && !url.includes('/overage')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([org]),
+      })
+    }
+    if (url.includes('/usage')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(usage),
+      })
+    }
+    if (url.includes('/account')) {
+      if (accountFails) {
+        return Promise.resolve({ ok: false, status: 500 })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(account),
+      })
+    }
+    if (url.includes('/overage')) {
+      if (overageFails) {
+        return Promise.resolve({ ok: false, status: 500 })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(overage),
+      })
+    }
+    return Promise.resolve({ ok: false, status: 404 })
+  }
+}
+
 describe('fetchClaude', () => {
   beforeEach(() => {
     clearMocks()
@@ -235,59 +285,173 @@ describe('fetchClaude', () => {
     expect(result.message).toContain('No organization')
   })
 
-  test('returns usage data on success', async () => {
+  test('returns Pro plan with session-only data', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 
-    mockFetch.mockImplementation((url) => {
-      if (url.includes('/organizations') && !url.includes('/usage')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve([{ uuid: 'org-123', capabilities: ['claude_pro'] }]),
-        })
-      }
-      if (url.includes('/usage')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve({ five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } }),
-        })
-      }
-      return Promise.resolve({ ok: false, status: 404 })
-    })
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: {
+          five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' },
+        },
+      })
+    )
 
     const result = await fetchClaude()
     expect(result.status).toBe('ok')
     expect(result.data.plan).toBe('Pro')
-    expect(result.data.used).toBe(45)
-    expect(result.data.limit).toBe(100)
+    expect(result.data.fiveHour.used).toBe(45)
+    expect(result.data.fiveHour.reset).toBe('2025-01-01T00:00:00Z')
+    expect(result.data.weekly).toBeNull()
+    expect(result.data.opus).toBeNull()
+    expect(result.data.extra.enabled).toBe(false)
   })
 
-  test('returns Free plan when no claude_pro capability', async () => {
+  test('returns Max plan with opus window and extra spend', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 
-    mockFetch.mockImplementation((url) => {
-      if (url.includes('/organizations') && !url.includes('/usage')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve([{ uuid: 'org-123', capabilities: [] }]),
-        })
-      }
-      if (url.includes('/usage')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ five_hour: { utilization: 10 } }),
-        })
-      }
-      return Promise.resolve({ ok: false, status: 404 })
-    })
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: {
+          five_hour: { utilization: 20, resets_at: '2025-01-01T05:00:00Z' },
+          seven_day: { utilization: 15, resets_at: '2025-01-08T00:00:00Z' },
+          seven_day_opus: { utilization: 10, resets_at: '2025-01-08T00:00:00Z' },
+          seven_day_sonnet: { utilization: 5, resets_at: '2025-01-08T00:00:00Z' },
+        },
+        overage: {
+          is_enabled: true,
+          used_credits: 550,
+          monthly_credit_limit: 2000,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Max')
+    expect(result.data.fiveHour.used).toBe(20)
+    expect(result.data.weekly.used).toBe(15)
+    expect(result.data.opus.used).toBe(10)
+    expect(result.data.sonnet.used).toBe(5)
+    expect(result.data.extra.enabled).toBe(true)
+    expect(result.data.extra.used).toBe(5.5)
+    expect(result.data.extra.limit).toBe(20)
+  })
+
+  test('returns Free plan with session-only data', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', capabilities: [] },
+        account: {},
+        usage: { five_hour: { utilization: 10 } },
+      })
+    )
 
     const result = await fetchClaude()
     expect(result.status).toBe('ok')
     expect(result.data.plan).toBe('Free')
+    expect(result.data.fiveHour.used).toBe(10)
+    expect(result.data.weekly).toBeNull()
+    expect(result.data.opus).toBeNull()
+  })
+
+  test('gracefully handles overage endpoint failure', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: { five_hour: { utilization: 50 } },
+        overageFails: true,
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro')
+    expect(result.data.fiveHour.used).toBe(50)
+    expect(result.data.extra.enabled).toBe(false)
+  })
+
+  test('gracefully handles account endpoint failure', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', capabilities: ['claude_pro'] },
+        usage: { five_hour: { utilization: 25 } },
+        accountFails: true,
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro')
+    expect(result.data.fiveHour.used).toBe(25)
+  })
+
+  test('returns Team plan from rate_limit_tier', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_team' },
+        usage: { five_hour: { utilization: 30 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Team')
+  })
+
+  test('returns Enterprise plan from rate_limit_tier', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_enterprise' },
+        usage: { five_hour: { utilization: 15 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Enterprise')
+  })
+
+  test('returns extra disabled when is_enabled false', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: { is_enabled: false, used_credits: 0, monthly_credit_limit: 0 },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.enabled).toBe(false)
+  })
+
+  test('handles null fiveHour window gracefully', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: {},
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.fiveHour).toBeNull()
   })
 })
 

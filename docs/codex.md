@@ -8,7 +8,7 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 
 **Cookie required:**
 
-- Name: `__Secure-next-auth.session-token`
+- Name: `__Secure-next-auth.session-token` or `next-auth.session-token`
 - Domain: `chatgpt.com`
 - Value: any non-empty string
 

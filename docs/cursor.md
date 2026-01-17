@@ -8,8 +8,8 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 
 **Cookie required:**
 
-- Name: `WorkosCursorSessionToken`
-- Domain: `cursor.com`
+- Name: `WorkosCursorSessionToken`, `__Secure-next-auth.session-token`, or `next-auth.session-token`
+- Domain: `cursor.com` or `cursor.sh`
 - Value: any non-empty string
 
 ## API Endpoints
@@ -46,6 +46,7 @@ Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `i
 - Limit: `individualUsage.plan.breakdown.total` or `individualUsage.plan.limit` (cents)
 - Reset: `billingCycleEnd` (ISO 8601 timestamp)
 - Returned as percentage (0-100%)
+- Falls back to `individualUsage.plan.totalPercentUsed` when plan limits are missing
 
 ### On-Demand Spend
 
@@ -79,7 +80,7 @@ Request-based usage for older Cursor plans.
 
 - Endpoint: `GET /api/usage?user={sub}` (fallback)
 - Triggered when `individualUsage` is missing from usage-summary
-- Field: `gpt-4.numRequests` - requests used
+- Field: `gpt-4.numRequestsTotal` (preferred) or `gpt-4.numRequests` - requests used
 - Field: `gpt-4.maxRequestUsage` - max requests (default 500)
 - Displayed as percentage + "X / Y" request count
 - Plan shows as "Legacy"

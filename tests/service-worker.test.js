@@ -32,22 +32,26 @@ import {
 describe('SERVICES config', () => {
   test('has claude config', () => {
     expect(SERVICES.claude).toBeDefined()
-    expect(SERVICES.claude.url).toBe('https://claude.ai')
-    expect(SERVICES.claude.cookie).toBe('sessionKey')
+    expect(SERVICES.claude.urls).toContain('https://claude.ai')
+    expect(SERVICES.claude.cookies).toContain('sessionKey')
     expect(SERVICES.claude.prefix).toBe('sk-ant-')
   })
 
   test('has chatgpt config', () => {
     expect(SERVICES.chatgpt).toBeDefined()
-    expect(SERVICES.chatgpt.url).toBe('https://chatgpt.com')
-    expect(SERVICES.chatgpt.cookie).toBe('__Secure-next-auth.session-token')
+    expect(SERVICES.chatgpt.urls).toContain('https://chatgpt.com')
+    expect(SERVICES.chatgpt.cookies).toContain('__Secure-next-auth.session-token')
+    expect(SERVICES.chatgpt.cookies).toContain('next-auth.session-token')
     expect(SERVICES.chatgpt.prefix).toBeNull()
   })
 
   test('has cursor config', () => {
     expect(SERVICES.cursor).toBeDefined()
-    expect(SERVICES.cursor.url).toBe('https://cursor.com')
-    expect(SERVICES.cursor.cookie).toBe('WorkosCursorSessionToken')
+    expect(SERVICES.cursor.urls).toContain('https://cursor.com')
+    expect(SERVICES.cursor.urls).toContain('https://cursor.sh')
+    expect(SERVICES.cursor.cookies).toContain('WorkosCursorSessionToken')
+    expect(SERVICES.cursor.cookies).toContain('__Secure-next-auth.session-token')
+    expect(SERVICES.cursor.cookies).toContain('next-auth.session-token')
     expect(SERVICES.cursor.prefix).toBeNull()
   })
 })
@@ -79,10 +83,22 @@ describe('getCookie', () => {
     expect(result).toBe('session-123')
   })
 
+  test('falls back to alternate chatgpt cookie', async () => {
+    setCookie('https://chatgpt.com', 'next-auth.session-token', 'session-456')
+    const result = await getCookie('chatgpt')
+    expect(result).toBe('session-456')
+  })
+
   test('returns cookie value for cursor', async () => {
     setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     const result = await getCookie('cursor')
     expect(result).toBe('cursor-session')
+  })
+
+  test('falls back to cursor alternate cookie and domain', async () => {
+    setCookie('https://cursor.sh', '__Secure-next-auth.session-token', 'cursor-alt')
+    const result = await getCookie('cursor')
+    expect(result).toBe('cursor-alt')
   })
 })
 
@@ -416,13 +432,14 @@ describe('fetchClaude', () => {
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_ultra', billing_type: null },
-        usage: { five_hour: { utilization: 12 } },
+        usage: { five_hour: { utilization: 12 }, seven_day: { utilization: 30 } },
       })
     )
 
     const result = await fetchClaude()
     expect(result.status).toBe('ok')
     expect(result.data.plan).toBe('Ultra')
+    expect(result.data.weekly.used).toBe(30)
   })
 
   test('returns Pro plan when billing_type indicates paid', async () => {
@@ -439,6 +456,21 @@ describe('fetchClaude', () => {
     const result = await fetchClaude()
     expect(result.status).toBe('ok')
     expect(result.data.plan).toBe('Pro')
+  })
+
+  test('does not use billing_type when tier is present', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { billing_type: 'stripe', rate_limit_tier: 'claude_team' },
+        usage: { five_hour: { utilization: 18 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Team')
   })
 
   test('returns Enterprise plan from rate_limit_tier', async () => {
@@ -526,6 +558,46 @@ describe('fetchCursor', () => {
     expect(result.data.used).toBe(25)
     expect(result.data.limit).toBe(100)
     expect(result.data.reset).toBe(Date.parse('2026-01-20T14:05:00Z'))
+  })
+
+  test('falls back to totalPercentUsed when plan limit missing', () => {
+    const usageWithPercent = {
+      ...CURSOR_USAGE_RESPONSE,
+      individualUsage: {
+        ...CURSOR_USAGE_RESPONSE.individualUsage,
+        plan: {
+          totalPercentUsed: 0.4,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithPercent,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.used).toBe(40)
+  })
+
+  test('handles totalPercentUsed in whole percentages', () => {
+    const usageWithPercent = {
+      ...CURSOR_USAGE_RESPONSE,
+      individualUsage: {
+        ...CURSOR_USAGE_RESPONSE.individualUsage,
+        plan: {
+          totalPercentUsed: 75,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithPercent,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.used).toBe(75)
   })
 
   test('returns breakdown data when present', () => {
@@ -655,9 +727,41 @@ describe('formatCodexPlan', () => {
 })
 
 describe('parseLegacyCursor', () => {
-  test('returns error for null data', () => {
-    const result = parseLegacyCursor(null, {})
+  test('handles missing data', () => {
+    const result = parseLegacyCursor(null)
     expect(result.status).toBe('error')
+  })
+
+  test('parses legacy cursor data', () => {
+    const data = {
+      'gpt-4': {
+        numRequests: 50,
+        maxRequestUsage: 200,
+      },
+    }
+    const user = { email: 'legacy@example.com' }
+    const result = parseLegacyCursor(data, user)
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Legacy')
+    expect(result.data.used).toBe(25)
+    expect(result.data.legacy.requests).toBe(50)
+    expect(result.data.legacy.max).toBe(200)
+    expect(result.data.email).toBe('legacy@example.com')
+  })
+
+  test('prefers numRequestsTotal when available', () => {
+    const data = {
+      'gpt-4': {
+        numRequests: 50,
+        numRequestsTotal: 75,
+        maxRequestUsage: 150,
+      },
+    }
+    const result = parseLegacyCursor(data, { email: 'total@example.com' })
+    expect(result.status).toBe('ok')
+    expect(result.data.used).toBe(50)
+    expect(result.data.legacy.requests).toBe(75)
+    expect(result.data.legacy.max).toBe(150)
   })
 
   test('parses gpt-4 request data', () => {

@@ -48,19 +48,19 @@ Fallbacks:
 
 ### Weekly (7-day)
 
-- **Max plan only**
+- **Max and Ultra plans**
 - Field: `seven_day.utilization` (0-100%)
 - Reset: `seven_day.resets_at` (ISO timestamp)
 
 ### Opus (7-day model-specific)
 
-- **Max plan only**
+- **Max and Ultra plans**
 - Field: `seven_day_opus.utilization` (0-100%)
 - Reset: `seven_day_opus.resets_at` (ISO timestamp)
 
 ### Sonnet (7-day model-specific)
 
-- **Max plan only**
+- **Max and Ultra plans**
 - Field: `seven_day_sonnet.utilization` (0-100%)
 - Tracked but not currently displayed in UI
 

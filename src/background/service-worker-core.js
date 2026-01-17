@@ -65,18 +65,22 @@ function formatCursorPlan(type) {
 
 export const SERVICES = {
   claude: {
-    url: 'https://claude.ai',
-    cookie: 'sessionKey',
+    urls: ['https://claude.ai'],
+    cookies: ['sessionKey'],
     prefix: 'sk-ant-',
   },
   chatgpt: {
-    url: 'https://chatgpt.com',
-    cookie: '__Secure-next-auth.session-token',
+    urls: ['https://chatgpt.com'],
+    cookies: ['__Secure-next-auth.session-token', 'next-auth.session-token'],
     prefix: null,
   },
   cursor: {
-    url: 'https://cursor.com',
-    cookie: 'WorkosCursorSessionToken',
+    urls: ['https://cursor.com', 'https://cursor.sh'],
+    cookies: [
+      'WorkosCursorSessionToken',
+      '__Secure-next-auth.session-token',
+      'next-auth.session-token',
+    ],
     prefix: null,
   },
 }
@@ -87,12 +91,17 @@ export async function getCookie(service) {
     return null
   }
 
-  const cookie = await chrome.cookies.get({
-    url: config.url,
-    name: config.cookie,
-  })
+  for (const url of config.urls) {
+    for (const name of config.cookies) {
+      // eslint-disable-next-line no-await-in-loop
+      const cookie = await chrome.cookies.get({ url, name })
+      if (cookie?.value) {
+        return cookie.value
+      }
+    }
+  }
 
-  return cookie?.value || null
+  return null
 }
 
 export function isValid(service, value) {
@@ -167,19 +176,16 @@ function parseOverage(data) {
 function detectPlan(account, org) {
   const tier = account?.rate_limit_tier
   const normalizedTier = tier ? String(tier).toLowerCase() : ''
-  if (normalizedTier) {
-    const known = CLAUDE_PLAN_LABELS[normalizedTier]
-    if (known) {
-      return known
-    }
-    if (normalizedTier.includes('ultra')) {
-      return 'Ultra'
-    }
+  const known = normalizedTier ? CLAUDE_PLAN_LABELS[normalizedTier] : null
+  if (known) {
+    return known
+  }
+  if (normalizedTier.includes('ultra')) {
+    return 'Ultra'
   }
 
   const billing = account?.billing_type ? String(account.billing_type).toLowerCase() : ''
-  const hasTier = normalizedTier.length > 0
-  if (billing.includes('stripe') && (!hasTier || normalizedTier.includes('claude'))) {
+  if (billing.includes('stripe') && (!normalizedTier || normalizedTier.includes('claude'))) {
     return 'Pro'
   }
 
@@ -223,7 +229,7 @@ export async function fetchClaude() {
   }
 
   const plan = detectPlan(account.data, org)
-  const isMax = plan === 'Max'
+  const isMaxOrUltra = plan === 'Max' || plan === 'Ultra'
   const windows = usage.data || {}
 
   return {
@@ -231,9 +237,9 @@ export async function fetchClaude() {
     data: {
       plan,
       fiveHour: parseWindow(windows.five_hour),
-      weekly: isMax ? parseWindow(windows.seven_day) : null,
-      opus: isMax ? parseWindow(windows.seven_day_opus) : null,
-      sonnet: isMax ? parseWindow(windows.seven_day_sonnet) : null,
+      weekly: isMaxOrUltra ? parseWindow(windows.seven_day) : null,
+      opus: isMaxOrUltra ? parseWindow(windows.seven_day_opus) : null,
+      sonnet: isMaxOrUltra ? parseWindow(windows.seven_day_sonnet) : null,
       extra: parseOverage(overage.data),
     },
   }
@@ -270,6 +276,14 @@ function parseCursorSummary(payload) {
   const planLimitRaw = Number(planBreakdown.total ?? plan.limit ?? 0)
   const percent = toPercent(planUsedRaw, planLimitRaw)
 
+  const totalPercent = plan.totalPercentUsed
+  const fallbackPercent =
+    totalPercent !== null && totalPercent !== undefined
+      ? Math.round((totalPercent <= 1 ? totalPercent : totalPercent / PERCENT_MAX) * PERCENT_MAX)
+      : null
+
+  const resolvedPercent = planLimitRaw > 0 ? percent : (fallbackPercent ?? 0)
+
   const onDemandUsedRaw = Number(onDemand.used || 0)
   const onDemandUsed = onDemandUsedRaw / CENTS_PER_DOLLAR
 
@@ -288,7 +302,7 @@ function parseCursorSummary(payload) {
     status: 'ok',
     data: {
       plan: formatCursorPlan(summary?.membershipType),
-      used: percent,
+      used: resolvedPercent,
       limit: PERCENT_MAX,
       reset: Number.isNaN(reset) ? null : reset,
       onDemand: onDemandUsed,
@@ -319,7 +333,7 @@ export function parseLegacyCursor(data, user) {
   }
 
   const gpt4 = data['gpt-4'] || {}
-  const used = gpt4.numRequests || 0
+  const used = gpt4.numRequestsTotal || gpt4.numRequests || 0
   const max = gpt4.maxRequestUsage || 500
   const percent = toPercent(used, max)
 

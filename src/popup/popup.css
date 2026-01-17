@@ -45,7 +45,7 @@ body.dark {
 }
 
 body {
-  width: 340px;
+  width: 320px;
   background: var(--bg);
   font-family: var(--sans);
   color: var(--text);
@@ -54,7 +54,7 @@ body {
 
 .container {
   position: relative;
-  padding: 12px;
+  padding: 10px;
 }
 
 /* Header */
@@ -62,8 +62,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -233,14 +233,14 @@ body.dark .toggle .moon {
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   box-shadow: var(--card-shadow);
 }
 
@@ -248,7 +248,7 @@ body.dark .toggle .moon {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .name {
@@ -298,7 +298,7 @@ body.dark .toggle .moon {
 
 /* Card body states */
 .card-body {
-  min-height: 60px;
+  min-height: 48px;
 }
 
 /* Loading */
@@ -342,7 +342,7 @@ body.dark .toggle .moon {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .label {
@@ -365,8 +365,8 @@ body.dark .toggle .moon {
 
 /* Section divider row */
 .row-sub {
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -386,11 +386,11 @@ body.dark .toggle .moon {
 
 /* Progress bar */
 .progress {
-  height: 4px;
+  height: 3px;
   background: var(--border);
   border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .bar {

@@ -3,8 +3,10 @@
 import { MS_PER_MINUTE, MS_PER_HOUR } from './constants.js'
 
 const MS_PER_SECOND = 1000
+const MS_PER_DAY = MS_PER_HOUR * 24
 const MS_TIMESTAMP_THRESHOLD = 1000000000000
 const MAX_PERCENT = 100
+const MIN_MINUTES = 1
 const TIME_SEPARATOR = ':'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -64,4 +66,37 @@ export function getUsagePercent(used, limit) {
   const ratio = used / limit
   const percent = Math.round(ratio * MAX_PERCENT)
   return Math.min(MAX_PERCENT, percent)
+}
+
+// Format countdown as relative (Xd Xh or Xh Xm)
+export function formatCountdown(timestamp) {
+  if (!timestamp) {
+    return ''
+  }
+
+  const ms = timestamp < MS_TIMESTAMP_THRESHOLD ? timestamp * MS_PER_SECOND : timestamp
+  const diff = ms - Date.now()
+
+  if (diff <= 0) {
+    return 'now'
+  }
+
+  const days = Math.floor(diff / MS_PER_DAY)
+  const hours = Math.floor((diff % MS_PER_DAY) / MS_PER_HOUR)
+
+  if (days > 0) {
+    if (hours > 0) {
+      return `${days}d ${hours}h`
+    }
+    return `${days}d`
+  }
+
+  const mins = Math.floor((diff % MS_PER_HOUR) / MS_PER_MINUTE)
+  if (hours > 0) {
+    if (mins > 0) {
+      return `${hours}h ${mins}m`
+    }
+    return `${hours}h`
+  }
+  return `${Math.max(MIN_MINUTES, mins)}m`
 }

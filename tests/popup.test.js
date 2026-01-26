@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { formatReset, formatWeeklyReset, getUsagePercent } from '../src/lib/format.js'
+import {
+  formatReset,
+  formatWeeklyReset,
+  formatCountdown,
+  getUsagePercent,
+} from '../src/lib/format.js'
 
 // Threshold constants for status (not exported from production code)
 const THRESHOLD_WARNING = 0.5
@@ -80,6 +85,10 @@ describe('Popup - formatWeeklyReset', () => {
     expect(formatWeeklyReset(null)).toBe('--')
   })
 
+  test('returns placeholder for invalid timestamp', () => {
+    expect(formatWeeklyReset('invalid')).toBe('--')
+  })
+
   test('formats epoch seconds', () => {
     const reset = Date.UTC(2026, 0, 20, 14, 5, 0) / 1000
     expect(formatWeeklyReset(reset)).toBe('Jan 20, 2026 2:05 PM')
@@ -88,5 +97,51 @@ describe('Popup - formatWeeklyReset', () => {
   test('formats milliseconds timestamp', () => {
     const reset = Date.UTC(2026, 5, 3, 9, 30, 0)
     expect(formatWeeklyReset(reset)).toBe('Jun 3, 2026 9:30 AM')
+  })
+})
+
+describe('Popup - formatCountdown', () => {
+  test('returns empty for null timestamp', () => {
+    expect(formatCountdown(null)).toBe('')
+  })
+
+  test('returns "now" for past timestamp', () => {
+    expect(formatCountdown(Date.now() - 1000)).toBe('now')
+  })
+
+  test('formats days and hours', () => {
+    const future = Date.now() + 5 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000
+    expect(formatCountdown(future)).toBe('5d 3h')
+  })
+
+  test('formats exact day boundary', () => {
+    const future = Date.now() + 2 * 24 * 60 * 60 * 1000
+    expect(formatCountdown(future)).toBe('2d')
+  })
+
+  test('formats hours and minutes when under a day', () => {
+    const future = Date.now() + 3 * 60 * 60 * 1000 + 15 * 60 * 1000
+    expect(formatCountdown(future)).toBe('3h 15m')
+  })
+
+  test('formats exact hour boundary', () => {
+    const future = Date.now() + 3 * 60 * 60 * 1000
+    expect(formatCountdown(future)).toBe('3h')
+  })
+
+  test('formats minutes only when under an hour', () => {
+    const future = Date.now() + 45 * 60 * 1000
+    expect(formatCountdown(future)).toBe('45m')
+  })
+
+  test('clamps under a minute to 1m', () => {
+    const future = Date.now() + 15 * 1000
+    expect(formatCountdown(future)).toBe('1m')
+  })
+
+  test('handles epoch seconds', () => {
+    const now = Math.ceil(Date.now() / 1000)
+    const future = now + 2 * 24 * 60 * 60 + 2 * 60 * 60
+    expect(formatCountdown(future)).toBe('2d 2h')
   })
 })

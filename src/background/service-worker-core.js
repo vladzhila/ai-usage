@@ -93,7 +93,6 @@ export async function getCookie(service) {
 
   for (const url of config.urls) {
     for (const name of config.cookies) {
-      // eslint-disable-next-line no-await-in-loop
       const cookie = await chrome.cookies.get({ url, name })
       if (cookie?.value) {
         return cookie.value

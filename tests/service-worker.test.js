@@ -56,6 +56,12 @@ describe('SERVICES config', () => {
   })
 })
 
+describe('formatCodexPlan', () => {
+  test('falls back to Free when type is empty', () => {
+    expect(formatCodexPlan('   ')).toBe('Free')
+  })
+})
+
 describe('getCookie', () => {
   beforeEach(() => {
     clearMocks()
@@ -215,6 +221,97 @@ describe('fetchJson', () => {
     const result = await fetchJson('https://example.com/api')
     expect(result.status).toBe('error')
     expect(result.message).toBe(FETCH_ERROR_MESSAGE)
+  })
+})
+
+describe('fetchClaude', () => {
+  beforeEach(() => {
+    mockFetch.mockClear()
+  })
+
+  test('returns usage error when usage fetch fails', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-test')
+    mockFetch.mockImplementation((url) => {
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([{ uuid: 'org-1' }]),
+        })
+      }
+      if (url.endsWith('/usage')) {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })
+      }
+      if (url.endsWith('/overage_spend_limit')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      if (url.endsWith('/api/account')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('error')
+    expect(result.message).toBe('HTTP 500')
+  })
+
+  test('detects Ultra plan from rate_limit_tier', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-test')
+    mockFetch.mockImplementation((url) => {
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([{ uuid: 'org-2', capabilities: [] }]),
+        })
+      }
+      if (url.endsWith('/usage')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              five_hour: { utilization: 10, resets_at: Date.now() + 1000 },
+              seven_day: { utilization: 20, resets_at: Date.now() + 2000 },
+              seven_day_opus: { utilization: 30, resets_at: Date.now() + 3000 },
+              seven_day_sonnet: { utilization: 40, resets_at: Date.now() + 4000 },
+            }),
+        })
+      }
+      if (url.endsWith('/overage_spend_limit')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({ is_enabled: true, used_credits: 100, monthly_credit_limit: 200 }),
+        })
+      }
+      if (url.endsWith('/api/account')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ rate_limit_tier: 'ULTRA' }),
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Ultra')
+    expect(result.data.weekly).toBeTruthy()
+    expect(result.data.opus).toBeTruthy()
+    expect(result.data.sonnet).toBeTruthy()
+    expect(result.data.extra.enabled).toBe(true)
+  })
+})
+
+describe('fetchCursor', () => {
+  test('returns payload error when status is not ok', () => {
+    const result = fetchCursor({ status: 'error', message: 'nope' })
+    expect(result.status).toBe('error')
+    expect(result.message).toBe('nope')
   })
 })
 

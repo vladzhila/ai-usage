@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test, beforeEach } from 'bun:test'
 import {
   formatReset,
   formatWeeklyReset,
@@ -6,10 +6,10 @@ import {
   getUsagePercent,
   formatWeeklyResetWithCountdown,
 } from '../src/lib/format.js'
-
-// Threshold constants for status (not exported from production code)
-const THRESHOLD_WARNING = 0.5
-const THRESHOLD_DANGER = 0.8
+import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../src/lib/constants.js'
+import { DEFAULT_ORDER, ORDER_KEY } from '../src/lib/visibility.js'
+import { createChromeMock, setStorage, clearMocks } from './mocks/chrome.js'
+import { Window } from 'happy-dom'
 
 function getStatus(percentage) {
   if (percentage >= THRESHOLD_DANGER) {
@@ -43,6 +43,199 @@ describe('Popup - getStatus', () => {
   test('returns "danger" for over 100%', () => {
     expect(getStatus(1.5)).toBe('danger')
   })
+})
+
+const POPUP_BODY_HTML = `
+  <div class="settings-wrap">
+    <button id="settings"></button>
+    <div id="dropdown">
+      <div data-provider="claude" draggable="true"></div>
+      <div data-provider="codex" draggable="true"></div>
+      <div data-provider="cursor" draggable="true"></div>
+    </div>
+  </div>
+  <button id="refresh"></button>
+  <button id="toggle"></button>
+  <div id="notice" class="hidden"></div>
+  <div id="empty" class="hidden"></div>
+  <input type="checkbox" id="show-claude" />
+  <input type="checkbox" id="show-codex" />
+  <input type="checkbox" id="show-cursor" />
+  <div data-service="claude">
+    <span class="dot"></span>
+    <div data-state="loading"></div>
+    <div data-state="ok"></div>
+    <div data-state="error"></div>
+    <div data-state="logged_out"></div>
+    <div data-state="expired"></div>
+    <div data-field="plan"></div>
+    <div data-field="error"></div>
+    <div data-field="session-used"></div>
+    <div data-field="session-bar"></div>
+    <div data-field="session-reset"></div>
+    <div data-section="weekly">
+      <div data-field="weekly-used"></div>
+      <div data-field="weekly-bar"></div>
+      <div data-field="weekly-reset"></div>
+    </div>
+    <div data-section="opus">
+      <div data-field="opus-used"></div>
+      <div data-field="opus-bar"></div>
+      <div data-field="opus-reset"></div>
+    </div>
+    <div data-section="extra">
+      <div data-field="extra-used"></div>
+      <div data-field="extra-limit"></div>
+    </div>
+  </div>
+  <div data-service="codex">
+    <span class="dot"></span>
+    <div data-state="loading"></div>
+    <div data-state="ok"></div>
+    <div data-state="error"></div>
+    <div data-state="logged_out"></div>
+    <div data-state="expired"></div>
+    <div data-field="plan"></div>
+    <div data-field="error"></div>
+    <div data-field="session-used"></div>
+    <div data-field="session-bar"></div>
+    <div data-field="session-reset"></div>
+    <div data-field="weekly-used"></div>
+    <div data-field="weekly-bar"></div>
+    <div data-field="weekly-reset"></div>
+    <div data-section="credits">
+      <div data-field="credits-display"></div>
+    </div>
+  </div>
+  <div data-service="cursor">
+    <span class="dot"></span>
+    <div data-state="loading"></div>
+    <div data-state="ok"></div>
+    <div data-state="error"></div>
+    <div data-state="logged_out"></div>
+    <div data-state="expired"></div>
+    <div data-field="plan"></div>
+    <div data-field="error"></div>
+    <div data-field="usage"></div>
+    <div data-field="bar"></div>
+    <div data-field="reset"></div>
+    <div data-section="on-demand">
+      <div data-field="on-demand-used"></div>
+      <div data-field="on-demand-limit-wrap">
+        <div data-field="on-demand-limit"></div>
+      </div>
+    </div>
+    <div data-section="legacy">
+      <div data-field="requests"></div>
+      <div data-field="max-requests"></div>
+    </div>
+  </div>
+`
+
+const testWindow = new Window()
+let popupLoaded = false
+
+function createDocument() {
+  const doc = testWindow.document
+  doc.documentElement.innerHTML = `<html><body>${POPUP_BODY_HTML}</body></html>`
+  globalThis.document = doc
+  globalThis.window = testWindow
+  globalThis.Event = testWindow.Event
+  globalThis.HTMLElement = testWindow.HTMLElement
+  globalThis.Node = testWindow.Node
+  return doc
+}
+
+function createDragEvent(window, type) {
+  const event = new window.Event(type, { bubbles: true, cancelable: true })
+  const dataTransfer = { effectAllowed: 'none' }
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer })
+  return event
+}
+
+function setStorageValues(values) {
+  if (!values) {
+    return
+  }
+  for (const [key, value] of Object.entries(values)) {
+    setStorage(key, value)
+  }
+}
+
+async function setupPopup({ storage, result }) {
+  clearMocks()
+  const chrome = createChromeMock()
+  globalThis.chrome = chrome
+  setStorageValues(storage)
+  if (!storage || !Object.prototype.hasOwnProperty.call(storage, ORDER_KEY)) {
+    setStorage(ORDER_KEY, DEFAULT_ORDER)
+  }
+  chrome.runtime.sendMessage = async () => result
+  const doc = createDocument()
+  if (!popupLoaded) {
+    await import('../src/popup/popup.js')
+    popupLoaded = true
+  }
+  doc.dispatchEvent(new Event('DOMContentLoaded'))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  return doc
+}
+
+function buildResult(overrides) {
+  const hidden = { status: 'hidden' }
+  return {
+    claude: hidden,
+    codex: hidden,
+    cursor: hidden,
+    ...overrides,
+  }
+}
+
+function buildCursorResult(data) {
+  return {
+    status: 'ok',
+    data: {
+      plan: 'Pro',
+      used: 0,
+      limit: 100,
+      reset: Date.now() + 60 * 60 * 1000,
+      onDemand: 0,
+      onDemandLimit: null,
+      legacy: null,
+      ...data,
+    },
+  }
+}
+
+function buildClaudeResult(data) {
+  return {
+    status: 'ok',
+    data: {
+      plan: 'Pro',
+      fiveHour: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
+      weekly: null,
+      opus: null,
+      extra: { enabled: false, used: 0, limit: 0 },
+      ...data,
+    },
+  }
+}
+
+function buildCodexResult(data) {
+  return {
+    status: 'ok',
+    data: {
+      plan: 'Plus',
+      session: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
+      weekly: { used: 20, reset: Date.now() + 2 * 60 * 60 * 1000 },
+      credits: { unlimited: false, has: false, balance: 0 },
+      ...data,
+    },
+  }
+}
+
+beforeEach(() => {
+  clearMocks()
 })
 
 describe('Popup - getUsagePercent', () => {
@@ -162,5 +355,513 @@ describe('Popup - formatWeeklyResetWithCountdown', () => {
 
   test('returns absolute when relative is empty', () => {
     expect(formatWeeklyResetWithCountdown(null)).toBe('--')
+  })
+})
+
+describe('Popup - DOM updates', () => {
+  test('hides cards and shows empty state when all hidden', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: false },
+      result: buildResult({}),
+    })
+
+    const claudeCard = doc.querySelector('[data-service="claude"]')
+    const codexCard = doc.querySelector('[data-service="codex"]')
+    const cursorCard = doc.querySelector('[data-service="cursor"]')
+    const empty = doc.getElementById('empty')
+
+    expect(claudeCard.classList.contains('hidden')).toBe(true)
+    expect(codexCard.classList.contains('hidden')).toBe(true)
+    expect(cursorCard.classList.contains('hidden')).toBe(true)
+    expect(empty.classList.contains('hidden')).toBe(false)
+  })
+
+  test('shows only enabled card when visibility is mixed', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({}),
+    })
+
+    const claudeCard = doc.querySelector('[data-service="claude"]')
+    const codexCard = doc.querySelector('[data-service="codex"]')
+    const cursorCard = doc.querySelector('[data-service="cursor"]')
+    const empty = doc.getElementById('empty')
+
+    expect(claudeCard.classList.contains('hidden')).toBe(false)
+    expect(codexCard.classList.contains('hidden')).toBe(true)
+    expect(cursorCard.classList.contains('hidden')).toBe(true)
+    expect(empty.classList.contains('hidden')).toBe(true)
+  })
+
+  test('sets bar status to ok below warning threshold', async () => {
+    const warningPercent = THRESHOLD_WARNING * 100
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ used: warningPercent - 1, limit: 100 }),
+      }),
+    })
+
+    const bar = doc.querySelector('[data-service="cursor"] [data-field="bar"]')
+    expect(bar.dataset.status).toBe('ok')
+  })
+
+  test('sets bar status to warning at threshold', async () => {
+    const warningPercent = THRESHOLD_WARNING * 100
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ used: warningPercent, limit: 100 }),
+      }),
+    })
+
+    const bar = doc.querySelector('[data-service="cursor"] [data-field="bar"]')
+    expect(bar.dataset.status).toBe('warning')
+  })
+
+  test('sets bar status to danger at threshold', async () => {
+    const dangerPercent = THRESHOLD_DANGER * 100
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ used: dangerPercent, limit: 100 }),
+      }),
+    })
+
+    const bar = doc.querySelector('[data-service="cursor"] [data-field="bar"]')
+    expect(bar.dataset.status).toBe('danger')
+  })
+
+  test('renders Codex credits as Unlimited', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: true, showCursor: false },
+      result: buildResult({
+        codex: {
+          status: 'ok',
+          data: {
+            plan: 'Plus',
+            session: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
+            weekly: { used: 20, reset: Date.now() + 2 * 60 * 60 * 1000 },
+            credits: { unlimited: true, has: false, balance: 0 },
+          },
+        },
+      }),
+    })
+
+    const creditsSection = doc.querySelector('[data-service="codex"] [data-section="credits"]')
+    const creditsDisplay = doc.querySelector(
+      '[data-service="codex"] [data-field="credits-display"]'
+    )
+
+    expect(creditsSection.style.display).toBe('block')
+    expect(creditsDisplay.textContent).toBe('Unlimited')
+  })
+
+  test('renders Codex credits balance with dollars', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: true, showCursor: false },
+      result: buildResult({
+        codex: {
+          status: 'ok',
+          data: {
+            plan: 'Plus',
+            session: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
+            weekly: { used: 20, reset: Date.now() + 2 * 60 * 60 * 1000 },
+            credits: { unlimited: false, has: true, balance: 12.34 },
+          },
+        },
+      }),
+    })
+
+    const creditsDisplay = doc.querySelector(
+      '[data-service="codex"] [data-field="credits-display"]'
+    )
+    expect(creditsDisplay.textContent).toBe('$12.34')
+  })
+
+  test('renders Claude extra spend section when enabled', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: {
+          status: 'ok',
+          data: {
+            plan: 'Max',
+            fiveHour: { used: 15, reset: Date.now() + 60 * 60 * 1000 },
+            weekly: null,
+            opus: null,
+            extra: { enabled: true, used: 12.3, limit: 45.6 },
+          },
+        },
+      }),
+    })
+
+    const extraSection = doc.querySelector('[data-service="claude"] [data-section="extra"]')
+    const extraUsed = doc.querySelector('[data-service="claude"] [data-field="extra-used"]')
+    const extraLimit = doc.querySelector('[data-service="claude"] [data-field="extra-limit"]')
+
+    expect(extraSection.style.display).toBe('block')
+    expect(extraUsed.textContent).toBe('12.30')
+    expect(extraLimit.textContent).toBe('45.60')
+  })
+
+  test('renders Cursor on-demand and legacy details', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({
+          used: 10,
+          onDemand: 3.5,
+          onDemandLimit: null,
+          legacy: { requests: 12, max: 500 },
+        }),
+      }),
+    })
+
+    const onDemandSection = doc.querySelector('[data-service="cursor"] [data-section="on-demand"]')
+    const onDemandUsed = doc.querySelector('[data-service="cursor"] [data-field="on-demand-used"]')
+    const onDemandLimitWrap = doc.querySelector(
+      '[data-service="cursor"] [data-field="on-demand-limit-wrap"]'
+    )
+    const legacySection = doc.querySelector('[data-service="cursor"] [data-section="legacy"]')
+    const legacyRequests = doc.querySelector('[data-service="cursor"] [data-field="requests"]')
+    const legacyMax = doc.querySelector('[data-service="cursor"] [data-field="max-requests"]')
+
+    expect(onDemandSection.style.display).toBe('block')
+    expect(onDemandUsed.textContent).toBe('3.50')
+    expect(onDemandLimitWrap.style.display).toBe('none')
+    expect(legacySection.style.display).toBe('block')
+    expect(legacyRequests.textContent).toBe('12')
+    expect(legacyMax.textContent).toBe('500')
+  })
+
+  test('renders Cursor on-demand limit when provided', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({
+          used: 10,
+          onDemand: 2.25,
+          onDemandLimit: 10,
+          legacy: null,
+        }),
+      }),
+    })
+
+    const onDemandLimitWrap = doc.querySelector(
+      '[data-service="cursor"] [data-field="on-demand-limit-wrap"]'
+    )
+    const onDemandLimit = doc.querySelector(
+      '[data-service="cursor"] [data-field="on-demand-limit"]'
+    )
+
+    expect(onDemandLimitWrap.style.display).toBe('')
+    expect(onDemandLimit.textContent).toBe('10.00')
+  })
+
+  test('toggles theme based on stored value and click', async () => {
+    const doc = await setupPopup({
+      storage: { theme: 'dark', showClaude: false, showCodex: false, showCursor: false },
+      result: buildResult({}),
+    })
+
+    expect(doc.body.classList.contains('dark')).toBe(true)
+    doc.getElementById('toggle').click()
+    expect(doc.body.classList.contains('dark')).toBe(false)
+  })
+
+  test('toggles dropdown and closes on outside click', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: false },
+      result: buildResult({}),
+    })
+
+    const dropdown = doc.getElementById('dropdown')
+    const wasHidden = dropdown.classList.contains('hidden')
+    doc.getElementById('settings').click()
+    expect(dropdown.classList.contains('hidden')).toBe(!wasHidden)
+
+    doc.body.dispatchEvent(new Event('click', { bubbles: true }))
+    expect(dropdown.classList.contains('hidden')).toBe(true)
+  })
+
+  test('handles notice message when cache is used', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: {
+        ...buildResult({
+          claude: buildClaudeResult({}),
+        }),
+        meta: { cache: true, message: 'Cached response' },
+      },
+    })
+
+    const notice = doc.getElementById('notice')
+    expect(notice.textContent).toBe('Cached response')
+    expect(notice.classList.contains('hidden')).toBe(false)
+  })
+
+  test('clears notice when no cache meta provided', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({}),
+      }),
+    })
+
+    const notice = doc.getElementById('notice')
+    expect(notice.textContent).toBe('')
+    expect(notice.classList.contains('hidden')).toBe(true)
+  })
+
+  test('shows errors when fetch fails', async () => {
+    clearMocks()
+    const chrome = createChromeMock()
+    globalThis.chrome = chrome
+    chrome.runtime.sendMessage = async () => {
+      throw new Error('network')
+    }
+    const doc = createDocument()
+    if (!popupLoaded) {
+      await import('../src/popup/popup.js')
+      popupLoaded = true
+    }
+    doc.dispatchEvent(new Event('DOMContentLoaded'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const errorField = doc.querySelector('[data-service="claude"] [data-field="error"]')
+    const dot = doc.querySelector('[data-service="claude"] .dot')
+    expect(errorField.textContent).toBe('Fetch failed. Try updating manually.')
+    expect(dot.dataset.status).toBe('error')
+  })
+
+  test('skips error update when card is missing', async () => {
+    clearMocks()
+    const chrome = createChromeMock()
+    globalThis.chrome = chrome
+    chrome.runtime.sendMessage = async () => {
+      throw new Error('network')
+    }
+    const doc = createDocument()
+    doc.querySelector('[data-service="cursor"]').remove()
+    if (!popupLoaded) {
+      await import('../src/popup/popup.js')
+      popupLoaded = true
+    }
+    doc.dispatchEvent(new Event('DOMContentLoaded'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const claudeDot = doc.querySelector('[data-service="claude"] .dot')
+    expect(claudeDot.dataset.status).toBe('error')
+  })
+
+  test('handles missing notice and card elements gracefully', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: true },
+      result: buildResult({
+        claude: { status: 'error' },
+        cursor: buildCursorResult({}),
+      }),
+    })
+
+    doc.getElementById('notice').remove()
+    doc.querySelector('[data-service="cursor"]').remove()
+    doc.getElementById('refresh').click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const claudeDot = doc.querySelector('[data-service="claude"] .dot')
+    expect(claudeDot.dataset.status).toBe('error')
+  })
+
+  test('handles missing empty state element', async () => {
+    clearMocks()
+    const chrome = createChromeMock()
+    globalThis.chrome = chrome
+    chrome.runtime.sendMessage = async () => buildResult({})
+    const doc = createDocument()
+    doc.getElementById('empty').remove()
+    if (!popupLoaded) {
+      await import('../src/popup/popup.js')
+      popupLoaded = true
+    }
+    doc.dispatchEvent(new Event('DOMContentLoaded'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const claudeCard = doc.querySelector('[data-service="claude"]')
+    expect(claudeCard).toBeTruthy()
+  })
+
+  test('shows unknown state without matching state element', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: { status: 'weird', message: 'oops' },
+      }),
+    })
+
+    const dot = doc.querySelector('[data-service="claude"] .dot')
+    expect(dot.dataset.status).toBe('weird')
+  })
+
+  test('skips missing fields and sections', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: true, showCursor: true },
+      result: buildResult({
+        claude: buildClaudeResult({}),
+        codex: buildCodexResult({ credits: { unlimited: true, has: true, balance: 0 } }),
+        cursor: buildCursorResult({ used: 30 }),
+      }),
+    })
+
+    doc.querySelector('[data-service="claude"] [data-field="plan"]').remove()
+    doc.querySelector('[data-service="codex"] [data-section="credits"]').remove()
+    doc.querySelector('[data-service="cursor"] [data-field="bar"]').remove()
+    doc.getElementById('refresh').click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const cursorUsage = doc.querySelector('[data-service="cursor"] [data-field="usage"]')
+    expect(cursorUsage.textContent).toBe('30')
+  })
+
+  test('updates Claude weekly and opus sections', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          weekly: { used: 40, reset: Date.now() + 2 * 60 * 60 * 1000 },
+          opus: { used: 55, reset: Date.now() + 3 * 60 * 60 * 1000 },
+        }),
+      }),
+    })
+
+    const weeklySection = doc.querySelector('[data-service="claude"] [data-section="weekly"]')
+    const opusSection = doc.querySelector('[data-service="claude"] [data-section="opus"]')
+    expect(weeklySection.style.display).toBe('block')
+    expect(opusSection.style.display).toBe('block')
+  })
+
+  test('hides Codex credits section when no credits', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: true, showCursor: false },
+      result: buildResult({
+        codex: buildCodexResult({ credits: { unlimited: false, has: false, balance: 0 } }),
+      }),
+    })
+
+    const creditsSection = doc.querySelector('[data-service="codex"] [data-section="credits"]')
+    expect(creditsSection.style.display).toBe('none')
+  })
+
+  test('hides Cursor on-demand and legacy sections when empty', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ onDemand: 0, legacy: null }),
+      }),
+    })
+
+    const onDemandSection = doc.querySelector('[data-service="cursor"] [data-section="on-demand"]')
+    const legacySection = doc.querySelector('[data-service="cursor"] [data-section="legacy"]')
+    expect(onDemandSection.style.display).toBe('none')
+    expect(legacySection.style.display).toBe('none')
+  })
+
+  test('updates visibility on checkbox change and fetches when enabled', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({}),
+        codex: buildCodexResult({}),
+        cursor: buildCursorResult({}),
+      }),
+    })
+
+    const claudeCheckbox = doc.getElementById('show-claude')
+    claudeCheckbox.checked = true
+    claudeCheckbox.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const codexCheckbox = doc.getElementById('show-codex')
+    codexCheckbox.checked = true
+    codexCheckbox.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const cursorCheckbox = doc.getElementById('show-cursor')
+    cursorCheckbox.checked = true
+    cursorCheckbox.dispatchEvent(new Event('change', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const claudeCard = doc.querySelector('[data-service="claude"]')
+    expect(claudeCard.classList.contains('hidden')).toBe(false)
+  })
+
+  test('clears refresh spinner after delay', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({}),
+      }),
+    })
+
+    const refresh = doc.getElementById('refresh')
+    refresh.click()
+    expect(refresh.classList.contains('spinning')).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    expect(refresh.classList.contains('spinning')).toBe(false)
+  })
+
+  test('reorders cards via drag and drop', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: true, showCursor: true },
+      result: buildResult({}),
+    })
+
+    const dropdown = doc.getElementById('dropdown')
+    const claudeItem = dropdown.querySelector('[data-provider="claude"]')
+    const cursorItem = dropdown.querySelector('[data-provider="cursor"]')
+
+    claudeItem.dispatchEvent(createDragEvent(globalThis.window, 'dragstart'))
+    cursorItem.dispatchEvent(createDragEvent(globalThis.window, 'dragover'))
+    cursorItem.dispatchEvent(createDragEvent(globalThis.window, 'drop'))
+    claudeItem.dispatchEvent(createDragEvent(globalThis.window, 'dragend'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const updatedOrder = (await globalThis.chrome.storage.local.get(ORDER_KEY))[ORDER_KEY]
+    expect(updatedOrder.includes('claude')).toBe(true)
+    expect(updatedOrder[2]).toBe('claude')
+  })
+
+  test('ignores drop when no drag source or same target', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: true, showCursor: true },
+      result: buildResult({}),
+    })
+
+    const dropdown = doc.getElementById('dropdown')
+    const codexItem = dropdown.querySelector('[data-provider="codex"]')
+
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'drop'))
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'dragstart'))
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'drop'))
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'dragend'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const stored = await globalThis.chrome.storage.local.get(ORDER_KEY)
+    expect(stored[ORDER_KEY]).toEqual(DEFAULT_ORDER)
+  })
+
+  test('removes drag-over class on drag leave', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: true, showCursor: true },
+      result: buildResult({}),
+    })
+
+    const dropdown = doc.getElementById('dropdown')
+    const claudeItem = dropdown.querySelector('[data-provider="claude"]')
+    const codexItem = dropdown.querySelector('[data-provider="codex"]')
+
+    claudeItem.dispatchEvent(createDragEvent(globalThis.window, 'dragstart'))
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'dragover'))
+    expect(codexItem.classList.contains('drag-over')).toBe(true)
+    codexItem.dispatchEvent(createDragEvent(globalThis.window, 'dragleave'))
+    expect(codexItem.classList.contains('drag-over')).toBe(false)
   })
 })

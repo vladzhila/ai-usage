@@ -19,9 +19,10 @@
     "@types/bun": "latest",
     "@types/chrome": "latest",
     "eslint": "latest",
-    "prettier": "latest",
+    "happy-dom": "^20.3.9",
     "husky": "latest",
-    "lint-staged": "latest"
+    "lint-staged": "latest",
+    "prettier": "latest"
   },
   "lint-staged": {
     "*/**": [

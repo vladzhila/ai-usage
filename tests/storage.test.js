@@ -19,6 +19,7 @@ import {
   CHATGPT_SESSION_WINDOW_MS,
   CLAUDE_SESSION_WINDOW_MS,
   createDefaultUsageData,
+  getWeekStart,
 } from '../src/lib/constants.js'
 
 describe('formatTimeRemaining', () => {
@@ -199,6 +200,18 @@ describe('incrementCount', () => {
 
     expect(result.session.count).toBe(1) // Reset to 1
     expect(result.weekly.count).toBe(1)
+  })
+
+  test('resets weekly count when week rolls over', async () => {
+    const defaults = createDefaultUsageData()
+    defaults[STORAGE_KEYS.CLAUDE].weekly.count = 12
+    defaults[STORAGE_KEYS.CLAUDE].weekly.weekStart = getWeekStart() - 7 * 24 * 60 * 60 * 1000
+    setStorage(STORAGE_KEYS.CLAUDE, defaults[STORAGE_KEYS.CLAUDE])
+
+    const result = await incrementCount(STORAGE_KEYS.CLAUDE)
+
+    expect(result.weekly.count).toBe(1)
+    expect(result.weekly.weekStart).toBe(getWeekStart())
   })
 })
 

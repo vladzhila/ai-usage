@@ -1,12 +1,15 @@
 // Popup script - fetches and displays usage data
 
 import { formatReset, getUsagePercent, formatWeeklyResetWithCountdown } from '../lib/format.js'
+import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../lib/constants.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
 // Theme constants
 const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
+const WARNING_PERCENT = THRESHOLD_WARNING * 100
+const DANGER_PERCENT = THRESHOLD_DANGER * 100
 
 // Get stored theme
 function getTheme() {
@@ -33,6 +36,10 @@ function toggleTheme() {
 async function initTheme() {
   const theme = await getTheme()
   setTheme(theme)
+}
+
+function getCard(service) {
+  return document.querySelector(`[data-service="${service}"]`)
 }
 
 // Get visibility settings from storage
@@ -154,24 +161,18 @@ function forEachVisible(visibility, callback) {
 
 // Apply visibility to cards and empty state
 function applyVisibility(visibility) {
-  const claudeCard = document.querySelector('[data-service="claude"]')
-  const codexCard = document.querySelector('[data-service="codex"]')
-  const cursorCard = document.querySelector('[data-service="cursor"]')
+  for (const { name } of SERVICES) {
+    const card = document.querySelector(`[data-service="${name}"]`)
+    if (card) {
+      card.classList.toggle('hidden', !visibility[name])
+    }
+  }
+
   const empty = document.getElementById('empty')
-
-  if (claudeCard) {
-    claudeCard.classList.toggle('hidden', !visibility.claude)
+  if (!empty) {
+    return
   }
-  if (codexCard) {
-    codexCard.classList.toggle('hidden', !visibility.codex)
-  }
-  if (cursorCard) {
-    cursorCard.classList.toggle('hidden', !visibility.cursor)
-  }
-
-  if (empty) {
-    empty.classList.toggle('hidden', !isAllHidden(visibility))
-  }
+  empty.classList.toggle('hidden', !isAllHidden(visibility))
 }
 
 // Toggle dropdown visibility
@@ -191,7 +192,7 @@ function handleClickOutside(event) {
 
 // Show specific state for a card
 function showState(service, state) {
-  const card = document.querySelector(`[data-service="${service}"]`)
+  const card = getCard(service)
   if (!card) {
     return
   }
@@ -221,13 +222,15 @@ function updateBar(card, field, percent) {
     return
   }
   bar.style.width = `${percent}%`
-  if (percent >= 80) {
+  if (percent >= DANGER_PERCENT) {
     bar.dataset.status = 'danger'
-  } else if (percent >= 50) {
-    bar.dataset.status = 'warning'
-  } else {
-    bar.dataset.status = 'ok'
+    return
   }
+  if (percent >= WARNING_PERCENT) {
+    bar.dataset.status = 'warning'
+    return
+  }
+  bar.dataset.status = 'ok'
 }
 
 // Set text content of a field within a card
@@ -269,74 +272,46 @@ function formatDollars(amount) {
   return (amount || 0).toFixed(2)
 }
 
-// Update card with data
-function updateCard(service, result) {
-  const card = document.querySelector(`[data-service="${service}"]`)
-  if (!card) {
-    return
+function updateClaudeCard(card, data) {
+  const { fiveHour, weekly, opus, extra = {} } = data
+
+  if (fiveHour) {
+    updateWindow(card, 'session', fiveHour, formatReset)
   }
 
-  // Handle non-ok status
-  if (result.status !== 'ok') {
-    showState(service, result.status)
-    if (result.message) {
-      setField(card, 'error', result.message)
-    }
-    return
-  }
-
-  // Show ok state
-  showState(service, 'ok')
-  const data = result.data
-
-  setField(card, 'plan', data.plan || 'Unknown')
-
-  // Claude: multi-window (session + weekly/opus for Max + extra)
-  if (service === 'claude') {
-    const { fiveHour, weekly, opus, extra = {} } = data
-
-    // Session window (always shown)
-    if (fiveHour) {
-      updateWindow(card, 'session', fiveHour, formatReset)
-    }
-
-    // Weekly/Opus sections (Max only)
-    showSection(card, 'weekly', weekly)
-    if (weekly) {
-      updateWeeklyWindow(card, 'weekly', weekly)
-    }
-
-    showSection(card, 'opus', opus)
-    if (opus) {
-      updateWeeklyWindow(card, 'opus', opus)
-    }
-
-    // Extra spend section
-    showSection(card, 'extra', extra.enabled)
-    if (extra.enabled) {
-      setField(card, 'extra-used', formatDollars(extra.used))
-      setField(card, 'extra-limit', formatDollars(extra.limit))
-    }
-    return
-  }
-
-  // Codex: dual windows (session + weekly) + credits
-  if (service === 'codex') {
-    const { session = {}, weekly = {}, credits = {} } = data
-    updateWindow(card, 'session', session, formatReset)
+  showSection(card, 'weekly', weekly)
+  if (weekly) {
     updateWeeklyWindow(card, 'weekly', weekly)
-
-    // Credits section
-    const hasCredits = credits.has || credits.unlimited || credits.balance > 0
-    showSection(card, 'credits', hasCredits)
-    if (hasCredits) {
-      const display = credits.unlimited ? 'Unlimited' : `$${credits.balance.toFixed(2)}`
-      setField(card, 'credits-display', display)
-    }
-    return
   }
 
-  // Cursor: single window + on-demand/legacy
+  showSection(card, 'opus', opus)
+  if (opus) {
+    updateWeeklyWindow(card, 'opus', opus)
+  }
+
+  showSection(card, 'extra', extra.enabled)
+  if (!extra.enabled) {
+    return
+  }
+  setField(card, 'extra-used', formatDollars(extra.used))
+  setField(card, 'extra-limit', formatDollars(extra.limit))
+}
+
+function updateCodexCard(card, data) {
+  const { session = {}, weekly = {}, credits = {} } = data
+  updateWindow(card, 'session', session, formatReset)
+  updateWeeklyWindow(card, 'weekly', weekly)
+
+  const hasCredits = credits.has || credits.unlimited || credits.balance > 0
+  showSection(card, 'credits', hasCredits)
+  if (!hasCredits) {
+    return
+  }
+  const display = credits.unlimited ? 'Unlimited' : `$${formatDollars(credits.balance)}`
+  setField(card, 'credits-display', display)
+}
+
+function updateCursorCard(card, data) {
   const used = data.used || 0
   const limit = data.limit || 0
   const percent = getUsagePercent(used, limit)
@@ -345,7 +320,6 @@ function updateCard(service, result) {
   updateBar(card, 'bar', percent)
   setWeeklyResetField(card, 'reset', data.reset)
 
-  // On-demand section
   const onDemand = data.onDemand || 0
   const onDemandLimit = data.onDemandLimit
   const hasOnDemand = onDemand > 0
@@ -361,13 +335,43 @@ function updateCard(service, result) {
     }
   }
 
-  // Legacy section
   const legacy = data.legacy
   showSection(card, 'legacy', Boolean(legacy))
-  if (legacy) {
-    setField(card, 'requests', legacy.requests)
-    setField(card, 'max-requests', legacy.max)
+  if (!legacy) {
+    return
   }
+  setField(card, 'requests', legacy.requests)
+  setField(card, 'max-requests', legacy.max)
+}
+
+const CARD_HANDLERS = {
+  claude: updateClaudeCard,
+  codex: updateCodexCard,
+  cursor: updateCursorCard,
+}
+
+// Update card with data
+function updateCard(service, result) {
+  const card = getCard(service)
+  if (!card) {
+    return
+  }
+
+  if (result.status !== 'ok') {
+    showState(service, result.status)
+    if (result.message) {
+      setField(card, 'error', result.message)
+    }
+    return
+  }
+
+  showState(service, 'ok')
+  const data = result.data
+
+  setField(card, 'plan', data.plan || 'Unknown')
+
+  const handler = CARD_HANDLERS[service] || updateCursorCard
+  handler(card, data)
 }
 
 const SPIN_DELAY_MS = 300
@@ -385,7 +389,7 @@ function setNotice(message) {
 }
 
 function setError(service, message) {
-  const card = document.querySelector(`[data-service="${service}"]`)
+  const card = getCard(service)
   if (!card) {
     return
   }

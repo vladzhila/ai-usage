@@ -1,6 +1,6 @@
 // Popup script - fetches and displays usage data
 
-import { formatReset, formatWeeklyReset, formatCountdown, getUsagePercent } from '../lib/format.js'
+import { formatReset, getUsagePercent, formatWeeklyResetWithCountdown } from '../lib/format.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
 // Theme constants
@@ -238,15 +238,6 @@ function setField(card, field, value) {
   }
 }
 
-// Set text content and tooltip of a field within a card
-function setFieldWithTooltip(card, field, value, tooltip) {
-  const el = card.querySelector(`[data-field="${field}"]`)
-  if (el) {
-    el.textContent = value
-    el.title = tooltip || ''
-  }
-}
-
 // Show/hide a section element
 function showSection(card, name, visible) {
   const section = card.querySelector(`[data-section="${name}"]`)
@@ -262,16 +253,15 @@ function updateWindow(card, prefix, window, formatter) {
   setField(card, `${prefix}-reset`, formatter(window.reset))
 }
 
-// Update a usage window section with countdown tooltip
-function updateWindowWithTooltip(card, prefix, window, formatter) {
+function setWeeklyResetField(card, field, timestamp) {
+  setField(card, field, formatWeeklyResetWithCountdown(timestamp))
+}
+
+// Update a usage window section with weekly reset display
+function updateWeeklyWindow(card, prefix, window) {
   setField(card, `${prefix}-used`, window.used || 0)
   updateBar(card, `${prefix}-bar`, window.used || 0)
-  setFieldWithTooltip(
-    card,
-    `${prefix}-reset`,
-    formatter(window.reset),
-    formatCountdown(window.reset)
-  )
+  setWeeklyResetField(card, `${prefix}-reset`, window.reset)
 }
 
 // Format dollar amount with 2 decimal places
@@ -313,12 +303,12 @@ function updateCard(service, result) {
     // Weekly/Opus sections (Max only)
     showSection(card, 'weekly', weekly)
     if (weekly) {
-      updateWindowWithTooltip(card, 'weekly', weekly, formatWeeklyReset)
+      updateWeeklyWindow(card, 'weekly', weekly)
     }
 
     showSection(card, 'opus', opus)
     if (opus) {
-      updateWindowWithTooltip(card, 'opus', opus, formatWeeklyReset)
+      updateWeeklyWindow(card, 'opus', opus)
     }
 
     // Extra spend section
@@ -334,7 +324,7 @@ function updateCard(service, result) {
   if (service === 'codex') {
     const { session = {}, weekly = {}, credits = {} } = data
     updateWindow(card, 'session', session, formatReset)
-    updateWindowWithTooltip(card, 'weekly', weekly, formatWeeklyReset)
+    updateWeeklyWindow(card, 'weekly', weekly)
 
     // Credits section
     const hasCredits = credits.has || credits.unlimited || credits.balance > 0
@@ -353,7 +343,7 @@ function updateCard(service, result) {
 
   setField(card, 'usage', percent)
   updateBar(card, 'bar', percent)
-  setFieldWithTooltip(card, 'reset', formatWeeklyReset(data.reset), formatCountdown(data.reset))
+  setWeeklyResetField(card, 'reset', data.reset)
 
   // On-demand section
   const onDemand = data.onDemand || 0

@@ -4,6 +4,7 @@ import {
   formatWeeklyReset,
   formatCountdown,
   getUsagePercent,
+  formatWeeklyResetWithCountdown,
 } from '../src/lib/format.js'
 
 // Threshold constants for status (not exported from production code)
@@ -143,5 +144,23 @@ describe('Popup - formatCountdown', () => {
     const now = Math.ceil(Date.now() / 1000)
     const future = now + 2 * 24 * 60 * 60 + 2 * 60 * 60
     expect(formatCountdown(future)).toBe('2d 2h')
+  })
+})
+
+describe('Popup - formatWeeklyResetWithCountdown', () => {
+  test('returns absolute and relative in one string', () => {
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    const originalNow = Date.now
+    Date.now = () => now
+
+    const timestamp = now + 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000
+    const formatted = formatWeeklyResetWithCountdown(timestamp)
+
+    expect(formatted).toBe(`${formatWeeklyReset(timestamp)} (2d 3h)`)
+    Date.now = originalNow
+  })
+
+  test('returns absolute when relative is empty', () => {
+    expect(formatWeeklyResetWithCountdown(null)).toBe('--')
   })
 })

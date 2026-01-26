@@ -100,3 +100,12 @@ export function formatCountdown(timestamp) {
   }
   return `${Math.max(MIN_MINUTES, mins)}m`
 }
+
+export function formatWeeklyResetWithCountdown(timestamp) {
+  const absolute = formatWeeklyReset(timestamp)
+  const relative = formatCountdown(timestamp)
+  if (!relative) {
+    return absolute
+  }
+  return `${absolute} (${relative})`
+}

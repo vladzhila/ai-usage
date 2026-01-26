@@ -1,14 +1,11 @@
-// Core service worker logic - extracted for testability
-
 export const CACHE_KEY = 'usage_cache'
-export const CACHE_TTL = 60000 // 1 minute
+export const CACHE_TTL = 60000
 export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
 const CURSOR_DATA_ERROR = 'No Cursor data'
 const PERCENT_MAX = 100
 const CENTS_PER_DOLLAR = 100
 
-// Claude plan mapping from rate_limit_tier
 const CLAUDE_PLAN_LABELS = {
   claude_max: 'Max',
   claude_pro: 'Pro',
@@ -17,7 +14,6 @@ const CLAUDE_PLAN_LABELS = {
   claude_ultra: 'Ultra',
 }
 
-// ChatGPT/Codex plan mapping
 const CODEX_PLAN_LABELS = {
   guest: 'Guest',
   free: 'Free',
@@ -34,7 +30,6 @@ const CODEX_PLAN_LABELS = {
   edu: 'Education',
 }
 
-// Cursor plan mapping
 const CURSOR_PLAN_LABELS = {
   free: 'Free',
   enterprise: 'Enterprise',
@@ -45,7 +40,6 @@ const CURSOR_PLAN_LABELS = {
   team: 'Team',
 }
 
-// Shared plan formatter
 function formatPlan(type, labels, fallback) {
   if (!type) {
     return fallback
@@ -152,7 +146,6 @@ export function isCacheValid(cache) {
   return Date.now() - cache.timestamp < CACHE_TTL
 }
 
-// Parse usage window (five_hour, seven_day, etc.)
 function parseWindow(window) {
   if (!window) {
     return null
@@ -163,7 +156,7 @@ function parseWindow(window) {
   }
 }
 
-// Parse overage spend data (cents → dollars)
+// Converts cents-based fields to dollars.
 function parseOverage(data) {
   const enabled = Boolean(data?.is_enabled)
   return {
@@ -173,7 +166,7 @@ function parseOverage(data) {
   }
 }
 
-// Detect Claude plan from rate_limit_tier or capabilities
+// Heuristics for Claude plan when tier is missing.
 function detectPlan(account, org) {
   const tier = account?.rate_limit_tier
   const normalizedTier = tier ? String(tier).toLowerCase() : ''
@@ -190,7 +183,6 @@ function detectPlan(account, org) {
     return 'Pro'
   }
 
-  // Fallback to capabilities check
   const caps = org?.capabilities || []
   if (caps.includes('claude_pro')) {
     return 'Pro'
@@ -217,14 +209,12 @@ export async function fetchClaude() {
 
   const baseUrl = `https://claude.ai/api/organizations/${org.uuid}`
 
-  // Parallel fetch: usage, overage, account
   const [usage, overage, account] = await Promise.all([
     fetchJson(`${baseUrl}/usage`),
     fetchJson(`${baseUrl}/overage_spend_limit`),
     fetchJson('https://claude.ai/api/account'),
   ])
 
-  // Usage is required
   if (usage.status !== 'ok') {
     return usage
   }

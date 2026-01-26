@@ -1,9 +1,8 @@
-// Formatting utilities for popup display
-
 import { MS_PER_MINUTE, MS_PER_HOUR } from './constants.js'
 
 const MS_PER_SECOND = 1000
 const MS_PER_DAY = MS_PER_HOUR * 24
+// Heuristic to treat values as seconds vs ms.
 const MS_TIMESTAMP_THRESHOLD = 1000000000000
 const MAX_PERCENT = 100
 const MIN_MINUTES = 1

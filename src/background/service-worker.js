@@ -1,4 +1,4 @@
-// Service Worker - handles API calls and caching
+// Service worker fetches usage and caches results.
 
 import {
   getCookie,
@@ -121,7 +121,7 @@ async function fetchCursorUsage() {
     const usageData = await usage.json()
     const userData = await user.json()
 
-    // Check for legacy plan (no individualUsage)
+    // Fallback for legacy Cursor accounts without individualUsage.
     if (!usageData?.individualUsage && userData?.sub) {
       const legacy = await fetch(`${CURSOR_LEGACY_URL}?user=${userData.sub}`, {
         credentials: 'include',
@@ -137,8 +137,6 @@ async function fetchCursorUsage() {
     return { status: 'error', message: 'Refresh cursor.com tab' }
   }
 }
-
-// ============ Main Handler ============
 
 function isFailure(result) {
   return result?.status === 'error'
@@ -176,7 +174,7 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true,
   const cursor = normalizeResult(results[2])
   const result = { claude, codex, cursor }
 
-  // Only cache if we fetched visible providers and they succeeded
+  // Cache only when all requested providers succeed.
   const providers = ['claude', 'codex', 'cursor']
   const visibleResults = results.filter((_, i) => visibility[providers[i]])
   if (visibleResults.length > 0 && !hasFailure(visibleResults)) {
@@ -230,8 +228,6 @@ async function safeFetchAll(force, visibility) {
     }
   }
 }
-
-// ============ Message Listener ============
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === 'FETCH_USAGE') {

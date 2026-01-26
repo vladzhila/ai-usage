@@ -1,17 +1,13 @@
-// Popup script - fetches and displays usage data
-
 import { formatReset, getUsagePercent, formatWeeklyResetWithCountdown } from '../lib/format.js'
 import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../lib/constants.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
-// Theme constants
 const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
 const WARNING_PERCENT = THRESHOLD_WARNING * 100
 const DANGER_PERCENT = THRESHOLD_DANGER * 100
 
-// Get stored theme
 function getTheme() {
   return new Promise((resolve) => {
     chrome.storage.local.get(THEME_KEY, (result) => {
@@ -20,19 +16,16 @@ function getTheme() {
   })
 }
 
-// Save and apply theme
 function setTheme(theme) {
   chrome.storage.local.set({ [THEME_KEY]: theme })
   document.body.classList.toggle(DARK, theme === DARK)
 }
 
-// Toggle between themes
 function toggleTheme() {
   const next = document.body.classList.contains(DARK) ? LIGHT : DARK
   setTheme(next)
 }
 
-// Initialize theme on load
 async function initTheme() {
   const theme = await getTheme()
   setTheme(theme)
@@ -42,7 +35,6 @@ function getCard(service) {
   return document.querySelector(`[data-service="${service}"]`)
 }
 
-// Get visibility settings from storage
 function getVisibility() {
   const keys = SERVICES.map((s) => s.key)
   return new Promise((resolve) => {
@@ -52,12 +44,10 @@ function getVisibility() {
   })
 }
 
-// Save visibility setting
 function setVisibility(key, value) {
   chrome.storage.local.set({ [key]: value })
 }
 
-// Get order from storage
 function getOrder() {
   return new Promise((resolve) => {
     chrome.storage.local.get(ORDER_KEY, (result) => {
@@ -66,12 +56,10 @@ function getOrder() {
   })
 }
 
-// Save order to storage
 function setOrder(order) {
   chrome.storage.local.set({ [ORDER_KEY]: order })
 }
 
-// Apply CSS order to cards and dropdown items
 function applyOrder(order) {
   const dropdown = document.getElementById('dropdown')
   order.forEach((provider, index) => {
@@ -86,7 +74,6 @@ function applyOrder(order) {
   })
 }
 
-// Initialize order and drag-drop on load
 async function initOrder() {
   const order = await getOrder()
   applyOrder(order)
@@ -128,7 +115,7 @@ async function initOrder() {
       return
     }
 
-    // Capture before await (dragend may null dragged during async)
+    // dragend can clear `dragged` during the await.
     const from = dragged.dataset.provider
     const to = target.dataset.provider
     const current = await getOrder()
@@ -150,7 +137,6 @@ async function initOrder() {
   })
 }
 
-// Run callback for each visible service
 function forEachVisible(visibility, callback) {
   for (const s of SERVICES) {
     if (visibility[s.name]) {
@@ -159,7 +145,6 @@ function forEachVisible(visibility, callback) {
   }
 }
 
-// Apply visibility to cards and empty state
 function applyVisibility(visibility) {
   for (const { name } of SERVICES) {
     const card = document.querySelector(`[data-service="${name}"]`)
@@ -175,13 +160,11 @@ function applyVisibility(visibility) {
   empty.classList.toggle('hidden', !isAllHidden(visibility))
 }
 
-// Toggle dropdown visibility
 function toggleDropdown() {
   const dropdown = document.getElementById('dropdown')
   dropdown.classList.toggle('hidden')
 }
 
-// Close dropdown when clicking outside
 function handleClickOutside(event) {
   const wrap = document.querySelector('.settings-wrap')
   const dropdown = document.getElementById('dropdown')
@@ -190,32 +173,27 @@ function handleClickOutside(event) {
   }
 }
 
-// Show specific state for a card
 function showState(service, state) {
   const card = getCard(service)
   if (!card) {
     return
   }
 
-  // Hide all states
   card.querySelectorAll('[data-state]').forEach((el) => {
     el.style.display = 'none'
   })
 
-  // Show target state
   const target = card.querySelector(`[data-state="${state}"]`)
   if (target) {
     target.style.display = 'block'
   }
 
-  // Update status dot
   const dot = card.querySelector('.dot')
   if (dot) {
     dot.dataset.status = state
   }
 }
 
-// Update progress bar
 function updateBar(card, field, percent) {
   const bar = card.querySelector(`[data-field="${field}"]`)
   if (!bar) {
@@ -233,7 +211,6 @@ function updateBar(card, field, percent) {
   bar.dataset.status = 'ok'
 }
 
-// Set text content of a field within a card
 function setField(card, field, value) {
   const el = card.querySelector(`[data-field="${field}"]`)
   if (el) {
@@ -241,7 +218,6 @@ function setField(card, field, value) {
   }
 }
 
-// Show/hide a section element
 function showSection(card, name, visible) {
   const section = card.querySelector(`[data-section="${name}"]`)
   if (section) {
@@ -249,7 +225,6 @@ function showSection(card, name, visible) {
   }
 }
 
-// Update a usage window section (used %, bar, reset)
 function updateWindow(card, prefix, window, formatter) {
   setField(card, `${prefix}-used`, window.used || 0)
   updateBar(card, `${prefix}-bar`, window.used || 0)
@@ -260,14 +235,12 @@ function setWeeklyResetField(card, field, timestamp) {
   setField(card, field, formatWeeklyResetWithCountdown(timestamp))
 }
 
-// Update a usage window section with weekly reset display
 function updateWeeklyWindow(card, prefix, window) {
   setField(card, `${prefix}-used`, window.used || 0)
   updateBar(card, `${prefix}-bar`, window.used || 0)
   setWeeklyResetField(card, `${prefix}-reset`, window.reset)
 }
 
-// Format dollar amount with 2 decimal places
 function formatDollars(amount) {
   return (amount || 0).toFixed(2)
 }
@@ -350,7 +323,6 @@ const CARD_HANDLERS = {
   cursor: updateCursorCard,
 }
 
-// Update card with data
 function updateCard(service, result) {
   const card = getCard(service)
   if (!card) {
@@ -398,14 +370,12 @@ function setError(service, message) {
   setField(card, 'error', message)
 }
 
-// Fetch data from service worker
 async function fetchData(force = false) {
   const btn = document.getElementById('refresh')
   btn.classList.add('spinning')
 
   const visibility = await getVisibility()
 
-  // Show loading only for visible providers
   forEachVisible(visibility, (name) => showState(name, 'loading'))
 
   chrome.runtime
@@ -437,22 +407,18 @@ async function fetchData(force = false) {
     })
 }
 
-// Initialize visibility settings
 async function initVisibility() {
   const visibility = await getVisibility()
   const checkboxes = {}
 
-  // Set checkbox states and build lookup
   for (const s of SERVICES) {
     const checkbox = document.getElementById(s.id)
     checkboxes[s.name] = checkbox
     checkbox.checked = visibility[s.name]
   }
 
-  // Apply visibility to cards
   applyVisibility(visibility)
 
-  // Wire up checkbox handlers
   for (const s of SERVICES) {
     checkboxes[s.name].addEventListener('change', (e) => {
       const checked = e.target.checked
@@ -471,7 +437,6 @@ async function initVisibility() {
   }
 }
 
-// Init
 document.addEventListener('DOMContentLoaded', () => {
   initTheme()
   initVisibility()

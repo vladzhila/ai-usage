@@ -1,7 +1,6 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { createChromeMock, clearMocks, setStorage, getStorage } from './mocks/chrome.js'
 
-// Setup global chrome mock before importing storage module
 const chrome = createChromeMock()
 globalThis.chrome = chrome
 

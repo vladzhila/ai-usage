@@ -1,5 +1,3 @@
-// Chrome API mocks for testing
-
 const storage = new Map()
 const cookies = new Map()
 
@@ -29,7 +27,6 @@ export function createChromeMock() {
   return {
     storage: {
       local: {
-        // Support both callback and promise styles
         get: (keys, callback) => {
           const result = getStorageResult(keys)
           if (callback) {
@@ -74,22 +71,18 @@ export function createChromeMock() {
   }
 }
 
-// Helper to set cookie values for testing
 export function setCookie(url, name, value) {
   cookies.set(`${url}:${name}`, value)
 }
 
-// Helper to set storage values for testing
 export function setStorage(key, value) {
   storage.set(key, value)
 }
 
-// Helper to get storage values for testing
 export function getStorage(key) {
   return storage.get(key)
 }
 
-// Helper to clear all mocks
 export function clearMocks() {
   storage.clear()
   cookies.clear()

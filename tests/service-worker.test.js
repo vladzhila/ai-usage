@@ -1,17 +1,14 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test'
 import { createChromeMock, setCookie, clearMocks, setStorage, getStorage } from './mocks/chrome.js'
 
-// Setup global chrome mock
 const chrome = createChromeMock()
 globalThis.chrome = chrome
 
-// Mock fetch
 const mockFetch = mock(() =>
   Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
 )
 globalThis.fetch = mockFetch
 
-// Import after setting up mocks
 import {
   SERVICES,
   CACHE_KEY,
@@ -315,7 +312,6 @@ describe('fetchCursor', () => {
   })
 })
 
-// Helper to create mock fetch for Claude API
 function createClaudeMock(options = {}) {
   const {
     org = { uuid: 'org-123', capabilities: ['claude_pro'] },

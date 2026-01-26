@@ -9,7 +9,6 @@ import {
   parseOrder,
 } from '../src/lib/visibility.js'
 
-// Setup global chrome mock
 const chrome = createChromeMock()
 globalThis.chrome = chrome
 

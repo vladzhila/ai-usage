@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import {
   formatReset,
+  formatSessionReset,
   formatWeeklyReset,
   formatCountdown,
   getUsagePercent,
@@ -19,6 +20,24 @@ function getStatus(percentage) {
     return 'warning'
   }
   return 'ok'
+}
+
+function withMockedDate(timestamp, fn) {
+  const originalNow = Date.now
+  const originalDate = globalThis.Date
+  globalThis.Date = class extends originalDate {
+    constructor(...args) {
+      if (args.length === 0) return new originalDate(timestamp)
+      return new originalDate(...args)
+    }
+  }
+  Date.now = () => timestamp
+  try {
+    return fn()
+  } finally {
+    Date.now = originalNow
+    globalThis.Date = originalDate
+  }
 }
 
 describe('Popup - getStatus', () => {
@@ -259,18 +278,26 @@ describe('Popup - formatReset', () => {
   })
 
   test('returns "now" for past timestamp', () => {
-    const past = Date.now() - 1000
-    expect(formatReset(past)).toBe('now')
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      expect(formatReset(now - 1000)).toBe('now')
+    })
   })
 
   test('formats hours and minutes', () => {
-    const future = Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000
-    expect(formatReset(future)).toBe('2h 30m')
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      const future = now + 2 * 60 * 60 * 1000 + 30 * 60 * 1000
+      expect(formatReset(future)).toBe('2h 30m')
+    })
   })
 
   test('formats minutes only when less than hour', () => {
-    const future = Date.now() + 45 * 60 * 1000
-    expect(formatReset(future)).toBe('45m')
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      const future = now + 45 * 60 * 1000
+      expect(formatReset(future)).toBe('45m')
+    })
   })
 })
 
@@ -340,17 +367,55 @@ describe('Popup - formatCountdown', () => {
   })
 })
 
+describe('Popup - formatSessionReset', () => {
+  test('returns absolute time with relative countdown', () => {
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      const timestamp = now + 5 * 60 * 60 * 1000 + 30 * 60 * 1000
+      expect(formatSessionReset(timestamp)).toBe('5:30 PM (5h 30m)')
+    })
+  })
+
+  test('returns just absolute time when reset is now', () => {
+    const now = Date.UTC(2026, 0, 20, 14, 5, 0)
+    withMockedDate(now, () => {
+      expect(formatSessionReset(now)).toBe('2:05 PM')
+    })
+  })
+
+  test('returns -- for null timestamp', () => {
+    expect(formatSessionReset(null)).toBe('--')
+  })
+
+  test('returns -- for invalid date string', () => {
+    expect(formatSessionReset('invalid-date')).toBe('--')
+  })
+
+  test('handles epoch seconds', () => {
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      const futureSeconds = Math.ceil(now / 1000) + 2 * 60 * 60
+      expect(formatSessionReset(futureSeconds)).toBe('2:00 PM (2h)')
+    })
+  })
+
+  test('handles ISO string timestamps', () => {
+    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
+    withMockedDate(now, () => {
+      expect(formatSessionReset('2026-01-20T17:30:00Z')).toBe('5:30 PM (5h 30m)')
+    })
+  })
+})
+
 describe('Popup - formatWeeklyResetWithCountdown', () => {
   test('returns absolute and relative in one string', () => {
     const now = Date.UTC(2026, 0, 20, 12, 0, 0)
-    const originalNow = Date.now
-    Date.now = () => now
-
-    const timestamp = now + 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000
-    const formatted = formatWeeklyResetWithCountdown(timestamp)
-
-    expect(formatted).toBe(`${formatWeeklyReset(timestamp)} (2d 3h)`)
-    Date.now = originalNow
+    withMockedDate(now, () => {
+      const timestamp = now + 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000
+      expect(formatWeeklyResetWithCountdown(timestamp)).toBe(
+        `${formatWeeklyReset(timestamp)} (2d 3h)`
+      )
+    })
   })
 
   test('returns absolute when relative is empty', () => {
@@ -457,7 +522,7 @@ describe('Popup - DOM updates', () => {
     expect(creditsDisplay.textContent).toBe('Unlimited')
   })
 
-  test('renders Codex credits balance with dollars', async () => {
+  test('renders Codex credits balance', async () => {
     const doc = await setupPopup({
       storage: { showClaude: false, showCodex: true, showCursor: false },
       result: buildResult({
@@ -476,7 +541,7 @@ describe('Popup - DOM updates', () => {
     const creditsDisplay = doc.querySelector(
       '[data-service="codex"] [data-field="credits-display"]'
     )
-    expect(creditsDisplay.textContent).toBe('$12.34')
+    expect(creditsDisplay.textContent).toBe('12.34 credits')
   })
 
   test('renders Claude extra spend section when enabled', async () => {

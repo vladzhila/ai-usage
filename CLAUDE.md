@@ -23,15 +23,21 @@ bun run format       # Prettier format all
 
 - `src/background/service-worker.js` - Fetches usage from claude.ai, chatgpt.com, cursor.com APIs
 - `src/popup/popup.js` - UI logic, sends `FETCH_USAGE` messages to background
-- `src/lib/constants.js` - Time windows (Claude 5h/ChatGPT 3h), limits, storage keys
-- `src/lib/storage.js` - Chrome storage wrapper with 1-minute cache TTL
+- `src/lib/constants.js` - Thresholds, plan labels
+- `src/lib/format.js` - Time formatting (session reset, weekly reset, countdown)
 
 **Providers**: Each has session windows, limits, and API-specific fetch logic. Data cached with fallback on fetch failure.
 
 # Development
 
-- After making changes, always add/update tests if applicable and run `bun test` to ensure all tests pass.
 - Use `code-simplifier:code-simplifier` subagent to refactor code.
+
+## Verification Workflow
+
+**Before declaring a feature "done":**
+
+1. **CRITICAL:** Every implementation must end with adding/updating tests
+2. **CRITICAL:** Run `bun run lint && bun test --coverage` - all must pass with 100% coverage
 
 # Testing
 

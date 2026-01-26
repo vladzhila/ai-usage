@@ -2,27 +2,6 @@ export const MS_PER_MINUTE = 60 * 1000
 export const MS_PER_HOUR = 60 * MS_PER_MINUTE
 export const MS_PER_DAY = 24 * MS_PER_HOUR
 
-export const CHATGPT_SESSION_WINDOW_MS = 3 * MS_PER_HOUR
-export const CLAUDE_SESSION_WINDOW_MS = 5 * MS_PER_HOUR
-export const WEEK_MS = 7 * MS_PER_DAY
-
-export const SESSION_WINDOW_MS = {
-  chatgpt: CHATGPT_SESSION_WINDOW_MS,
-  claude: CLAUDE_SESSION_WINDOW_MS,
-}
-
-export const CHATGPT_SESSION_LIMIT = 150
-export const CLAUDE_SESSION_LIMIT = 45
-
-export const STORAGE_KEYS = {
-  CHATGPT: 'chatgpt',
-  CLAUDE: 'claude',
-  OPENAI_API: 'openaiApi',
-  ANTHROPIC_API: 'anthropicApi',
-  SHOW_CLAUDE: 'showClaude',
-  SHOW_CODEX: 'showCodex',
-}
-
 // Usage thresholds for color indicators
 export const THRESHOLD_WARNING = 0.5 // 50% - yellow
 export const THRESHOLD_DANGER = 0.8 // 80% - red
@@ -33,27 +12,4 @@ export const CLAUDE_PLANS = {
   claude_team: 'Team',
   claude_enterprise: 'Enterprise',
   free: 'Free',
-}
-
-export const createDefaultUsageData = () => ({
-  [STORAGE_KEYS.CHATGPT]: {
-    session: { count: 0, limit: CHATGPT_SESSION_LIMIT, windowStart: Date.now() },
-    weekly: { count: 0, weekStart: getWeekStart() },
-  },
-  [STORAGE_KEYS.CLAUDE]: {
-    session: { count: 0, limit: CLAUDE_SESSION_LIMIT, windowStart: Date.now() },
-    weekly: { count: 0, weekStart: getWeekStart() },
-  },
-  [STORAGE_KEYS.OPENAI_API]: { spend: 0, updatedAt: null },
-  [STORAGE_KEYS.ANTHROPIC_API]: { spend: 0, updatedAt: null },
-})
-
-// Week starts Monday 00:00 local time.
-export function getWeekStart() {
-  const now = new Date()
-  const day = now.getDay()
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(now.setDate(diff))
-  monday.setHours(0, 0, 0, 0)
-  return monday.getTime()
 }

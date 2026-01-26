@@ -65,8 +65,8 @@ API credits for additional usage beyond subscription limits.
 - Field: `credits` object in usage response
 - `has_credits` - boolean, whether credits are available
 - `unlimited` - boolean, unlimited credits enabled
-- `balance` - number, current credit balance in dollars
-- Displayed as "$X.XX" or "Unlimited"
+- `balance` - number, current credit balance
+- Displayed as "X.XX credits" or "Unlimited"
 - Only shown when `has_credits`, `unlimited`, or `balance > 0`
 
 ## Data Structure
@@ -97,7 +97,7 @@ API credits for additional usage beyond subscription limits.
 - `src/background/service-worker-core.js` - `formatCodexPlan()`, `getCookie()`, `isValid()`, cookie config
 - `src/popup/popup.js` - `updateCard()` Codex section with dual windows + credits
 - `src/popup/popup.html` - Codex card template
-- `src/lib/constants.js` - `CHATGPT_SESSION_WINDOW_MS` (3 hours)
+- `src/lib/format.js` - `formatSessionReset()`, `formatWeeklyResetWithCountdown()`
 - `tests/service-worker.test.js` - Codex API + `formatCodexPlan()` tests
 
 ## Limitations

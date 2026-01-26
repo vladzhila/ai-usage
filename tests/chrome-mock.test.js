@@ -33,6 +33,16 @@ describe('chrome mock storage', () => {
     const empty = await chrome.storage.local.get(null)
     expect(Object.keys(empty).length).toBe(0)
   })
+
+  test('set with callback', () => {
+    const chrome = createChromeMock()
+    let called = false
+    chrome.storage.local.set({ foo: 'bar' }, () => {
+      called = true
+    })
+    expect(called).toBe(true)
+    expect(getStorage('foo')).toBe('bar')
+  })
 })
 
 describe('chrome mock helpers', () => {

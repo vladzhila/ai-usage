@@ -1,4 +1,8 @@
-import { formatReset, getUsagePercent, formatWeeklyResetWithCountdown } from '../lib/format.js'
+import {
+  formatSessionReset,
+  getUsagePercent,
+  formatWeeklyResetWithCountdown,
+} from '../lib/format.js'
 import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../lib/constants.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
@@ -249,7 +253,7 @@ function updateClaudeCard(card, data) {
   const { fiveHour, weekly, opus, extra = {} } = data
 
   if (fiveHour) {
-    updateWindow(card, 'session', fiveHour, formatReset)
+    updateWindow(card, 'session', fiveHour, formatSessionReset)
   }
 
   showSection(card, 'weekly', weekly)
@@ -272,7 +276,7 @@ function updateClaudeCard(card, data) {
 
 function updateCodexCard(card, data) {
   const { session = {}, weekly = {}, credits = {} } = data
-  updateWindow(card, 'session', session, formatReset)
+  updateWindow(card, 'session', session, formatSessionReset)
   updateWeeklyWindow(card, 'weekly', weekly)
 
   const hasCredits = credits.has || credits.unlimited || credits.balance > 0
@@ -280,7 +284,7 @@ function updateCodexCard(card, data) {
   if (!hasCredits) {
     return
   }
-  const display = credits.unlimited ? 'Unlimited' : `$${formatDollars(credits.balance)}`
+  const display = credits.unlimited ? 'Unlimited' : `${formatDollars(credits.balance)} credits`
   setField(card, 'credits-display', display)
 }
 

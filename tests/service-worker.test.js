@@ -600,87 +600,68 @@ describe('fetchCursor', () => {
     expect(result.data.used).toBe(75)
   })
 
-  test('returns breakdown data when present', () => {
-    const usageWithBreakdown = {
+  test('returns on-demand usage with limit', () => {
+    const usageWithOnDemand = {
       ...CURSOR_USAGE_RESPONSE,
       individualUsage: {
         ...CURSOR_USAGE_RESPONSE.individualUsage,
+        onDemand: {
+          used: 500,
+          limit: 10000,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithOnDemand,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.onDemand).toBe(5)
+    expect(result.data.onDemandLimit).toBe(100)
+  })
+
+  test('returns on-demand without limit when unlimited', () => {
+    const usageWithOnDemandNoLimit = {
+      ...CURSOR_USAGE_RESPONSE,
+      individualUsage: {
+        ...CURSOR_USAGE_RESPONSE.individualUsage,
+        onDemand: {
+          used: 750,
+        },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithOnDemandNoLimit,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.data.onDemand).toBe(7.5)
+    expect(result.data.onDemandLimit).toBeNull()
+  })
+
+  test('allows usage percentage above 100', () => {
+    const usageOver100 = {
+      ...CURSOR_USAGE_RESPONSE,
+      individualUsage: {
         plan: {
-          ...CURSOR_USAGE_RESPONSE.individualUsage.plan,
-          autoPercentUsed: 0.15,
-          apiPercentUsed: 0.1,
+          used: 15000,
+          limit: 10000,
+          breakdown: { total: 10000 },
         },
+        onDemand: { used: 0 },
       },
     }
 
     const result = fetchCursor({
-      usage: usageWithBreakdown,
+      usage: usageOver100,
       user: CURSOR_USER_RESPONSE,
     })
 
     expect(result.status).toBe('ok')
-    expect(result.data.breakdown.auto).toBe(15)
-    expect(result.data.breakdown.api).toBe(10)
-  })
-
-  test('returns null breakdown when not present', () => {
-    const result = fetchCursor({
-      usage: CURSOR_USAGE_RESPONSE,
-      user: CURSOR_USER_RESPONSE,
-    })
-
-    expect(result.data.breakdown.auto).toBeNull()
-    expect(result.data.breakdown.api).toBeNull()
-  })
-
-  test('returns team usage when present', () => {
-    const usageWithTeam = {
-      ...CURSOR_USAGE_RESPONSE,
-      teamUsage: {
-        onDemand: {
-          used: 1500,
-          limit: 5000,
-        },
-      },
-    }
-
-    const result = fetchCursor({
-      usage: usageWithTeam,
-      user: CURSOR_USER_RESPONSE,
-    })
-
-    expect(result.status).toBe('ok')
-    expect(result.data.team).toBeDefined()
-    expect(result.data.team.used).toBe(15)
-    expect(result.data.team.limit).toBe(50)
-  })
-
-  test('returns team without limit when limit not set', () => {
-    const usageWithTeamNoLimit = {
-      ...CURSOR_USAGE_RESPONSE,
-      teamUsage: {
-        onDemand: {
-          used: 2000,
-        },
-      },
-    }
-
-    const result = fetchCursor({
-      usage: usageWithTeamNoLimit,
-      user: CURSOR_USER_RESPONSE,
-    })
-
-    expect(result.data.team.used).toBe(20)
-    expect(result.data.team.limit).toBeNull()
-  })
-
-  test('returns null team when not present', () => {
-    const result = fetchCursor({
-      usage: CURSOR_USAGE_RESPONSE,
-      user: CURSOR_USER_RESPONSE,
-    })
-
-    expect(result.data.team).toBeNull()
+    expect(result.data.used).toBe(150)
   })
 })
 
@@ -805,7 +786,7 @@ describe('parseLegacyCursor', () => {
     expect(result.data.used).toBe(10)
   })
 
-  test('caps percentage at 100', () => {
+  test('allows percentage above 100', () => {
     const data = {
       'gpt-4': {
         numRequests: 600,
@@ -814,6 +795,6 @@ describe('parseLegacyCursor', () => {
     }
 
     const result = parseLegacyCursor(data, {})
-    expect(result.data.used).toBe(100)
+    expect(result.data.used).toBe(120)
   })
 })

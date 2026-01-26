@@ -251,8 +251,7 @@ function toPercent(used, limit) {
   }
 
   const ratio = used / limit
-  const percent = Math.round(ratio * PERCENT_MAX)
-  return Math.min(PERCENT_MAX, Math.max(0, percent))
+  return Math.round(ratio * PERCENT_MAX)
 }
 
 function parseCursorSummary(payload) {
@@ -286,17 +285,14 @@ function parseCursorSummary(payload) {
 
   const onDemandUsedRaw = Number(onDemand.used || 0)
   const onDemandUsed = onDemandUsedRaw / CENTS_PER_DOLLAR
+  const onDemandLimitRaw = onDemand.limit
+  const onDemandLimit =
+    onDemandLimitRaw !== null && onDemandLimitRaw !== undefined
+      ? onDemandLimitRaw / CENTS_PER_DOLLAR
+      : null
 
   const cycleEnd = summary?.billingCycleEnd
   const reset = cycleEnd ? Date.parse(cycleEnd) : null
-
-  // Percentage breakdown (auto vs api)
-  const autoPercent = plan.autoPercentUsed
-  const apiPercent = plan.apiPercentUsed
-
-  // Team on-demand usage
-  const teamOnDemand = summary?.teamUsage?.onDemand || {}
-  const hasTeam = teamOnDemand.used !== null && teamOnDemand.used !== undefined
 
   return {
     status: 'ok',
@@ -306,23 +302,8 @@ function parseCursorSummary(payload) {
       limit: PERCENT_MAX,
       reset: Number.isNaN(reset) ? null : reset,
       onDemand: onDemandUsed,
+      onDemandLimit,
       email: user?.email || null,
-      breakdown: {
-        auto:
-          autoPercent !== null && autoPercent !== undefined
-            ? Math.round(autoPercent * PERCENT_MAX)
-            : null,
-        api:
-          apiPercent !== null && apiPercent !== undefined
-            ? Math.round(apiPercent * PERCENT_MAX)
-            : null,
-      },
-      team: hasTeam
-        ? {
-            used: teamOnDemand.used / CENTS_PER_DOLLAR,
-            limit: teamOnDemand.limit ? teamOnDemand.limit / CENTS_PER_DOLLAR : null,
-          }
-        : null,
     },
   }
 }
@@ -345,9 +326,8 @@ export function parseLegacyCursor(data, user) {
       limit: PERCENT_MAX,
       reset: null,
       onDemand: 0,
+      onDemandLimit: null,
       email: user?.email || null,
-      breakdown: { auto: null, api: null },
-      team: null,
       legacy: { requests: used, max },
     },
   }

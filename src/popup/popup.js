@@ -325,7 +325,7 @@ function updateCard(service, result) {
     return
   }
 
-  // Cursor: single window + breakdown/legacy/team
+  // Cursor: single window + on-demand/legacy
   const used = data.used || 0
   const limit = data.limit || 0
   const percent = getUsagePercent(used, limit)
@@ -334,13 +334,20 @@ function updateCard(service, result) {
   updateBar(card, 'bar', percent)
   setField(card, 'reset', formatWeeklyReset(data.reset))
 
-  // Breakdown section
-  const breakdown = data.breakdown || {}
-  const hasBreakdown = breakdown.auto !== null || breakdown.api !== null
-  showSection(card, 'breakdown', hasBreakdown)
-  if (hasBreakdown) {
-    setField(card, 'auto-percent', breakdown.auto ?? 0)
-    setField(card, 'api-percent', breakdown.api ?? 0)
+  // On-demand section
+  const onDemand = data.onDemand || 0
+  const onDemandLimit = data.onDemandLimit
+  const hasOnDemand = onDemand > 0
+  showSection(card, 'on-demand', hasOnDemand)
+  if (hasOnDemand) {
+    setField(card, 'on-demand-used', formatDollars(onDemand))
+    const limitWrap = card.querySelector('[data-field="on-demand-limit-wrap"]')
+    if (limitWrap) {
+      limitWrap.style.display = onDemandLimit !== null ? '' : 'none'
+    }
+    if (onDemandLimit !== null) {
+      setField(card, 'on-demand-limit', formatDollars(onDemandLimit))
+    }
   }
 
   // Legacy section
@@ -349,20 +356,6 @@ function updateCard(service, result) {
   if (legacy) {
     setField(card, 'requests', legacy.requests)
     setField(card, 'max-requests', legacy.max)
-  }
-
-  // Team section
-  const team = data.team
-  showSection(card, 'team', Boolean(team))
-  if (team) {
-    setField(card, 'team-used', team.used.toFixed(2))
-    const limitWrap = card.querySelector('[data-field="team-limit-wrap"]')
-    if (limitWrap) {
-      limitWrap.style.display = team.limit ? '' : 'none'
-    }
-    if (team.limit) {
-      setField(card, 'team-limit', team.limit.toFixed(2))
-    }
   }
 }
 

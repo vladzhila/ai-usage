@@ -30,6 +30,8 @@ Plan is detected from `membershipType` in usage response:
 | ------------ | ---------- |
 | `free`       | Free       |
 | `pro`        | Pro        |
+| `pro_plus`   | Pro+       |
+| `ultra`      | Ultra      |
 | `hobby`      | Hobby      |
 | `team`       | Team       |
 | `enterprise` | Enterprise |
@@ -52,27 +54,21 @@ Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `i
 
 - Field: `individualUsage.onDemand.used` (cents)
 - Converted to dollars for internal tracking
-- Not currently displayed in popup UI
+- Displayed in popup UI when usage is greater than $0
 
 ## Usage Breakdown
 
-Auto vs API percentage breakdown (when available).
+Auto vs API percentage breakdown fields are present in the API but are not currently displayed in the popup UI.
 
 - Field: `individualUsage.plan.autoPercentUsed` (0-1 float)
 - Field: `individualUsage.plan.apiPercentUsed` (0-1 float)
-- Converted to percentage (0-100%) for display
-- Only shown when values are present (not null/undefined)
-- Display: "AUTO X%" / "API Y%"
 
 ## Team Usage
 
-Team on-demand spend tracking (for team accounts).
+Team on-demand spend fields are present in the API but are not currently displayed in the popup UI.
 
 - Field: `teamUsage.onDemand.used` (cents)
 - Field: `teamUsage.onDemand.limit` (cents, optional)
-- Converted to dollars for display
-- Only shown when `teamUsage.onDemand.used` is present
-- Display: "$X.XX / $Y.YY" or "$X.XX" (if no limit)
 
 ## Legacy Plans
 
@@ -99,8 +95,7 @@ Request-based usage for older Cursor plans.
     reset: 'Unix-timestamp-ms',
     onDemand: 5.00,     // dollars (tracked, not displayed)
     email: 'user@example.com',
-    breakdown: { auto: 15, api: 10 },  // percentages, or { auto: null, api: null }
-    team: { used: 25.00, limit: 100.00 },  // dollars, or null
+    legacy: { requests: 250, max: 500 }, // legacy only
   }
 }
 ```
@@ -117,8 +112,6 @@ Request-based usage for older Cursor plans.
     reset: null,
     onDemand: 0,
     email: 'user@example.com',
-    breakdown: { auto: null, api: null },
-    team: null,
     legacy: { requests: 250, max: 500 },
   }
 }
@@ -138,13 +131,13 @@ Request-based usage for older Cursor plans.
 - `src/background/service-worker-core.js` - `fetchCursor()`, `parseCursorSummary()`, `parseLegacyCursor()`, `formatCursorPlan()`
 - `src/popup/popup.js` - `updateCard()` Cursor section with breakdown/legacy/team
 - `src/popup/popup.html` - Cursor card template
-- `tests/service-worker.test.js` - Cursor API + `parseLegacyCursor()` + breakdown/team tests
+- `tests/service-worker.test.js` - Cursor API + `parseLegacyCursor()` tests
 
 ## Limitations
 
 - **Percentage normalized** - Returns 0-100%, actual limits not exposed in UI
 - **Deeply nested API** - Usage at `usage.usage.individualUsage.plan.used`
-- **On-demand unused** - Individual on-demand tracked but not shown in popup
+- **On-demand conditional** - Only shown when usage is greater than $0
 - **No hourly/daily granularity** - Only monthly billing cycle tracking
 - **Breakdown optional** - Auto/API split only available on some accounts
 - **Legacy detection** - Relies on missing `individualUsage` to trigger fallback

@@ -39,6 +39,8 @@ const CURSOR_PLAN_LABELS = {
   free: 'Free',
   enterprise: 'Enterprise',
   pro: 'Pro',
+  pro_plus: 'Pro+',
+  ultra: 'Ultra',
   hobby: 'Hobby',
   team: 'Team',
 }
@@ -267,11 +269,10 @@ function parseCursorSummary(payload) {
   const summary = usage?.usage || usage
   const individual = summary?.individualUsage || {}
   const plan = individual?.plan || {}
-  const planBreakdown = plan?.breakdown || {}
   const onDemand = individual?.onDemand || {}
 
   const planUsedRaw = Number(plan.used || 0)
-  const planLimitRaw = Number(planBreakdown.total ?? plan.limit ?? 0)
+  const planLimitRaw = Number(plan.limit ?? 0)
   const percent = toPercent(planUsedRaw, planLimitRaw)
 
   const totalPercent = plan.totalPercentUsed

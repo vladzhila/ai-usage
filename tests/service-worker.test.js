@@ -560,6 +560,50 @@ describe('fetchCursor', () => {
     expect(result.data.reset).toBe(Date.parse('2026-01-20T14:05:00Z'))
   })
 
+  test('formats pro_plus plan', () => {
+    const result = fetchCursor({
+      usage: { ...CURSOR_USAGE_RESPONSE, membershipType: 'pro_plus' },
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro+')
+  })
+
+  test('formats ultra plan', () => {
+    const result = fetchCursor({
+      usage: { ...CURSOR_USAGE_RESPONSE, membershipType: 'ultra' },
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Ultra')
+  })
+
+  test('prefers plan limit over breakdown total', () => {
+    const usageWithBreakdown = {
+      billingCycleEnd: '2026-01-30T14:19:04.000Z',
+      membershipType: 'pro_plus',
+      individualUsage: {
+        plan: {
+          used: 3097,
+          limit: 7000,
+          breakdown: { included: 3097, bonus: 0, total: 3097 },
+          totalPercentUsed: 0.0607,
+        },
+        onDemand: { used: 0, limit: 1000 },
+      },
+    }
+
+    const result = fetchCursor({
+      usage: usageWithBreakdown,
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.used).toBe(44)
+  })
+
   test('falls back to totalPercentUsed when plan limit missing', () => {
     const usageWithPercent = {
       ...CURSOR_USAGE_RESPONSE,

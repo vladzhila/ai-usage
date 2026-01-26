@@ -43,7 +43,7 @@ Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `i
 
 - Single window based on monthly billing cycle
 - Usage: `individualUsage.plan.used` (cents)
-- Limit: `individualUsage.plan.breakdown.total` or `individualUsage.plan.limit` (cents)
+- Limit: `individualUsage.plan.limit` (cents)
 - Reset: `billingCycleEnd` (ISO 8601 timestamp)
 - Returned as percentage (0-100%)
 - Falls back to `individualUsage.plan.totalPercentUsed` when plan limits are missing

@@ -222,6 +222,19 @@ function setField(card, field, value) {
   }
 }
 
+function setResetField(card, field, timestamp, formatter) {
+  const el = card.querySelector(`[data-field="${field}"]`)
+  if (!el) {
+    return
+  }
+  const value = formatter(timestamp)
+  el.textContent = value
+  const row = el.closest('.row')
+  if (row) {
+    row.style.display = value ? '' : 'none'
+  }
+}
+
 function showSection(card, name, visible) {
   const section = card.querySelector(`[data-section="${name}"]`)
   if (section) {
@@ -232,17 +245,11 @@ function showSection(card, name, visible) {
 function updateWindow(card, prefix, window, formatter) {
   setField(card, `${prefix}-used`, window.used || 0)
   updateBar(card, `${prefix}-bar`, window.used || 0)
-  setField(card, `${prefix}-reset`, formatter(window.reset))
-}
-
-function setWeeklyResetField(card, field, timestamp) {
-  setField(card, field, formatWeeklyResetWithCountdown(timestamp))
+  setResetField(card, `${prefix}-reset`, window.reset, formatter)
 }
 
 function updateWeeklyWindow(card, prefix, window) {
-  setField(card, `${prefix}-used`, window.used || 0)
-  updateBar(card, `${prefix}-bar`, window.used || 0)
-  setWeeklyResetField(card, `${prefix}-reset`, window.reset)
+  updateWindow(card, prefix, window, formatWeeklyResetWithCountdown)
 }
 
 function formatDollars(amount) {
@@ -295,7 +302,7 @@ function updateCursorCard(card, data) {
 
   setField(card, 'usage', percent)
   updateBar(card, 'bar', percent)
-  setWeeklyResetField(card, 'reset', data.reset)
+  setResetField(card, 'reset', data.reset, formatWeeklyResetWithCountdown)
 
   const onDemand = data.onDemand || 0
   const onDemandLimit = data.onDemandLimit

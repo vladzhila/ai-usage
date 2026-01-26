@@ -11,7 +11,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 // Format reset time as relative (Xh Xm)
 export function formatReset(timestamp) {
   if (!timestamp) {
-    return '--'
+    return ''
   }
 
   const diff = new Date(timestamp) - new Date()
@@ -52,14 +52,14 @@ function toMs(timestamp) {
 // Format session reset as absolute time with relative countdown (2:05 PM (5h 30m))
 export function formatSessionReset(timestamp) {
   if (!timestamp) {
-    return '--'
+    return ''
   }
 
   const ms = toMs(timestamp)
   const reset = new Date(ms)
 
   if (Number.isNaN(reset.getTime())) {
-    return '--'
+    return ''
   }
 
   const absolute = formatTime12h(reset)
@@ -78,14 +78,14 @@ function padTime(value) {
 // Format weekly reset as absolute date (Jan 20, 2026 2:05 PM)
 export function formatWeeklyReset(timestamp) {
   if (!timestamp) {
-    return '--'
+    return ''
   }
 
   const ms = toMs(timestamp)
   const reset = new Date(ms)
 
   if (Number.isNaN(reset.getTime())) {
-    return '--'
+    return ''
   }
 
   const day = reset.getDate()

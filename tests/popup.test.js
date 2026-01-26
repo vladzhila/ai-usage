@@ -91,16 +91,16 @@ const POPUP_BODY_HTML = `
     <div data-field="error"></div>
     <div data-field="session-used"></div>
     <div data-field="session-bar"></div>
-    <div data-field="session-reset"></div>
+    <div class="row" data-row="session-reset"><div data-field="session-reset"></div></div>
     <div data-section="weekly">
       <div data-field="weekly-used"></div>
       <div data-field="weekly-bar"></div>
-      <div data-field="weekly-reset"></div>
+      <div class="row" data-row="weekly-reset"><div data-field="weekly-reset"></div></div>
     </div>
     <div data-section="opus">
       <div data-field="opus-used"></div>
       <div data-field="opus-bar"></div>
-      <div data-field="opus-reset"></div>
+      <div class="row" data-row="opus-reset"><div data-field="opus-reset"></div></div>
     </div>
     <div data-section="extra">
       <div data-field="extra-used"></div>
@@ -118,10 +118,10 @@ const POPUP_BODY_HTML = `
     <div data-field="error"></div>
     <div data-field="session-used"></div>
     <div data-field="session-bar"></div>
-    <div data-field="session-reset"></div>
+    <div class="row" data-row="session-reset"><div data-field="session-reset"></div></div>
     <div data-field="weekly-used"></div>
     <div data-field="weekly-bar"></div>
-    <div data-field="weekly-reset"></div>
+    <div class="row" data-row="weekly-reset"><div data-field="weekly-reset"></div></div>
     <div data-section="credits">
       <div data-field="credits-display"></div>
     </div>
@@ -137,7 +137,7 @@ const POPUP_BODY_HTML = `
     <div data-field="error"></div>
     <div data-field="usage"></div>
     <div data-field="bar"></div>
-    <div data-field="reset"></div>
+    <div class="row" data-row="reset"><div data-field="reset"></div></div>
     <div data-section="on-demand">
       <div data-field="on-demand-used"></div>
       <div data-field="on-demand-limit-wrap">
@@ -273,8 +273,8 @@ describe('Popup - getUsagePercent', () => {
 })
 
 describe('Popup - formatReset', () => {
-  test('returns placeholder for empty timestamp', () => {
-    expect(formatReset(null)).toBe('--')
+  test('returns empty for null timestamp', () => {
+    expect(formatReset(null)).toBe('')
   })
 
   test('returns "now" for past timestamp', () => {
@@ -302,12 +302,12 @@ describe('Popup - formatReset', () => {
 })
 
 describe('Popup - formatWeeklyReset', () => {
-  test('returns placeholder for empty timestamp', () => {
-    expect(formatWeeklyReset(null)).toBe('--')
+  test('returns empty for null timestamp', () => {
+    expect(formatWeeklyReset(null)).toBe('')
   })
 
-  test('returns placeholder for invalid timestamp', () => {
-    expect(formatWeeklyReset('invalid')).toBe('--')
+  test('returns empty for invalid timestamp', () => {
+    expect(formatWeeklyReset('invalid')).toBe('')
   })
 
   test('formats epoch seconds', () => {
@@ -383,12 +383,12 @@ describe('Popup - formatSessionReset', () => {
     })
   })
 
-  test('returns -- for null timestamp', () => {
-    expect(formatSessionReset(null)).toBe('--')
+  test('returns empty for null timestamp', () => {
+    expect(formatSessionReset(null)).toBe('')
   })
 
-  test('returns -- for invalid date string', () => {
-    expect(formatSessionReset('invalid-date')).toBe('--')
+  test('returns empty for invalid date string', () => {
+    expect(formatSessionReset('invalid-date')).toBe('')
   })
 
   test('handles epoch seconds', () => {
@@ -418,8 +418,8 @@ describe('Popup - formatWeeklyResetWithCountdown', () => {
     })
   })
 
-  test('returns absolute when relative is empty', () => {
-    expect(formatWeeklyResetWithCountdown(null)).toBe('--')
+  test('returns empty when timestamp is null', () => {
+    expect(formatWeeklyResetWithCountdown(null)).toBe('')
   })
 })
 
@@ -928,5 +928,91 @@ describe('Popup - DOM updates', () => {
     expect(codexItem.classList.contains('drag-over')).toBe(true)
     codexItem.dispatchEvent(createDragEvent(globalThis.window, 'dragleave'))
     expect(codexItem.classList.contains('drag-over')).toBe(false)
+  })
+
+  test('shows reset row when reset timestamp is valid', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ reset: Date.now() + 60 * 60 * 1000 }),
+      }),
+    })
+
+    const resetRow = doc.querySelector('[data-service="cursor"] [data-row="reset"]')
+    expect(resetRow.style.display).toBe('')
+  })
+
+  test('hides reset row when reset timestamp is null', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ reset: null }),
+      }),
+    })
+
+    const resetRow = doc.querySelector('[data-service="cursor"] [data-row="reset"]')
+    expect(resetRow.style.display).toBe('none')
+  })
+
+  test('hides Claude session reset row when timestamp is missing', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          fiveHour: { used: 10, reset: null },
+        }),
+      }),
+    })
+
+    const resetRow = doc.querySelector('[data-service="claude"] [data-row="session-reset"]')
+    expect(resetRow.style.display).toBe('none')
+  })
+
+  test('shows Codex session reset row when timestamp is valid', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: true, showCursor: false },
+      result: buildResult({
+        codex: buildCodexResult({
+          session: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
+        }),
+      }),
+    })
+
+    const resetRow = doc.querySelector('[data-service="codex"] [data-row="session-reset"]')
+    expect(resetRow.style.display).toBe('')
+  })
+
+  test('handles missing reset field element gracefully', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ reset: Date.now() + 60 * 60 * 1000 }),
+      }),
+    })
+
+    doc.querySelector('[data-service="cursor"] [data-field="reset"]').remove()
+    doc.getElementById('refresh').click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const dot = doc.querySelector('[data-service="cursor"] .dot')
+    expect(dot.dataset.status).toBe('ok')
+  })
+
+  test('handles reset field without row parent gracefully', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ reset: Date.now() + 60 * 60 * 1000 }),
+      }),
+    })
+
+    const resetRow = doc.querySelector('[data-service="cursor"] [data-row="reset"]')
+    const resetField = doc.querySelector('[data-service="cursor"] [data-field="reset"]')
+    resetRow.parentNode.appendChild(resetField)
+    resetRow.remove()
+    doc.getElementById('refresh').click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(resetField.textContent).toBeTruthy()
   })
 })

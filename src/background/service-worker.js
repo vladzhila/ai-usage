@@ -11,6 +11,7 @@ import {
   formatCodexPlan,
   parseLegacyCursor,
 } from './service-worker-core.js'
+import { startDevReload } from './dev-reload.js'
 
 const CHATGPT_URL = 'https://chatgpt.com'
 const CHATGPT_SESSION_URL = `${CHATGPT_URL}/api/auth/session`
@@ -138,10 +139,6 @@ async function fetchCursorUsage() {
   }
 }
 
-function isFailure(result) {
-  return result?.status === 'error'
-}
-
 function normalizeResult(result) {
   return result.status === 'fulfilled'
     ? result.value
@@ -149,19 +146,27 @@ function normalizeResult(result) {
 }
 
 function hasFailure(results) {
-  return results.some((r) => r.status === 'rejected' || isFailure(r.value))
+  return results.some((r) => r.status === 'rejected' || r.value?.status === 'error')
 }
 
 const HIDDEN_RESULT = { status: 'hidden' }
 
+function buildResponse(visibility, data, meta) {
+  const response = {
+    claude: visibility.claude ? data.claude : HIDDEN_RESULT,
+    codex: visibility.codex ? data.codex : HIDDEN_RESULT,
+    cursor: visibility.cursor ? data.cursor : HIDDEN_RESULT,
+  }
+  if (meta) {
+    response.meta = meta
+  }
+  return response
+}
+
 async function fetchAll(force = false, visibility = { claude: true, codex: true, cursor: true }) {
   const cache = await getCache()
   if (!force && isCacheValid(cache)) {
-    return {
-      claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
-      codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
-      cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
-    }
+    return buildResponse(visibility, cache)
   }
 
   const claudePromise = visibility.claude ? fetchClaude() : Promise.resolve(HIDDEN_RESULT)
@@ -189,19 +194,13 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true,
   }
 
   if (cache) {
-    return {
-      claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
-      codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
-      cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
-      meta: {
-        cache: true,
-        message: CACHE_FALLBACK_MESSAGE,
-      },
-    }
+    return buildResponse(visibility, cache, { cache: true, message: CACHE_FALLBACK_MESSAGE })
   }
 
   return result
 }
+
+const CACHE_META = { cache: true, message: CACHE_FALLBACK_MESSAGE }
 
 async function safeFetchAll(force, visibility) {
   try {
@@ -209,23 +208,15 @@ async function safeFetchAll(force, visibility) {
   } catch {
     const cache = await getCache()
     if (cache) {
-      return {
-        claude: visibility.claude ? cache.claude : HIDDEN_RESULT,
-        codex: visibility.codex ? cache.codex : HIDDEN_RESULT,
-        cursor: visibility.cursor ? cache.cursor : HIDDEN_RESULT,
-        meta: {
-          cache: true,
-          message: CACHE_FALLBACK_MESSAGE,
-        },
-      }
+      return buildResponse(visibility, cache, CACHE_META)
     }
 
     const errorResult = { status: 'error', message: FALLBACK_ERROR_MESSAGE }
-    return {
-      claude: visibility.claude ? errorResult : HIDDEN_RESULT,
-      codex: visibility.codex ? errorResult : HIDDEN_RESULT,
-      cursor: visibility.cursor ? errorResult : HIDDEN_RESULT,
-    }
+    return buildResponse(visibility, {
+      claude: errorResult,
+      codex: errorResult,
+      cursor: errorResult,
+    })
   }
 }
 
@@ -235,3 +226,5 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     return true
   }
 })
+
+startDevReload()

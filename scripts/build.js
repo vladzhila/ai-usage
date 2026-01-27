@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, watch as fsWatch } from 'fs'
 import { extname, join } from 'path'
 
 const SCRIPT_SUFFIX = '/scripts'
@@ -12,6 +12,7 @@ const WATCH_FLAG = '--watch'
 const MODE_DEV = 'development'
 const MODE_PROD = 'production'
 const BUILD_MESSAGE = 'Build complete: dist/'
+const WATCH_MESSAGE = 'Watching for changes...'
 const ICON_MESSAGE = 'Generated placeholder icons (replace with real icons for production)'
 const SKIP_EXT = new Set(['.js', '.css'])
 const ENTRYPOINTS = ['background/service-worker.js', 'popup/popup.js', 'popup/popup.css'].map(
@@ -19,6 +20,10 @@ const ENTRYPOINTS = ['background/service-worker.js', 'popup/popup.js', 'popup/po
 )
 const STATICS = ['popup', 'background', 'lib']
 const ICON_SIZES = [16, 48, 128]
+const DEV_RELOAD_FILE = 'dev-reload.json'
+const DEV_RELOAD_KEY = 'stamp'
+const WATCH_DEBOUNCE_MS = 100
+const WATCH_RECURSIVE_OPTIONS = { recursive: true }
 const MIN_PNG = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
   0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
@@ -87,13 +92,13 @@ async function icons(from, to) {
   console.log(ICON_MESSAGE)
 }
 
-function watch(args) {
+function hasWatchFlag(args) {
   return args.includes(WATCH_FLAG)
 }
 
-async function bundle(isWatch) {
-  const mode = isWatch ? MODE_DEV : MODE_PROD
-  const minify = isWatch
+async function bundle(isDev) {
+  const mode = isDev ? MODE_DEV : MODE_PROD
+  const minify = isDev
     ? false
     : {
         whitespace: true,
@@ -110,7 +115,6 @@ async function bundle(isWatch) {
     splitting: false,
     minify,
     sourcemap: 'none',
-    watch: isWatch,
   })
 
   if (result.success) {
@@ -126,13 +130,12 @@ async function bundle(isWatch) {
   throw new Error(errors || 'Build failed')
 }
 
-async function run() {
-  const args = process.argv.slice(2)
-  const isWatch = watch(args)
+async function writeDevReload() {
+  const payload = { [DEV_RELOAD_KEY]: Date.now() }
+  await Bun.write(join(DIST, DEV_RELOAD_FILE), JSON.stringify(payload))
+}
 
-  clean(DIST)
-  ensure(DIST)
-
+async function buildAll(isDev) {
   await copy(MANIFEST, join(DIST, MANIFEST_NAME))
 
   for (const dir of STATICS) {
@@ -140,9 +143,98 @@ async function run() {
   }
 
   await icons(ICONS, join(DIST, 'icons'))
-  await bundle(isWatch)
+  await bundle(isDev)
+
+  if (isDev) {
+    await writeDevReload()
+  }
 
   console.log(BUILD_MESSAGE)
+}
+
+function createDebounced(callback, delay) {
+  const state = { timer: null }
+  return function () {
+    if (state.timer) {
+      clearTimeout(state.timer)
+    }
+    state.timer = setTimeout(() => {
+      state.timer = null
+      callback()
+    }, delay)
+  }
+}
+
+function createBuildQueue(builder) {
+  const state = { running: false, queued: false }
+
+  async function run() {
+    if (state.running) {
+      state.queued = true
+      return
+    }
+
+    state.running = true
+    await builder()
+    state.running = false
+
+    if (!state.queued) {
+      return
+    }
+
+    state.queued = false
+    await run()
+  }
+
+  return run
+}
+
+function watchDir(path, onChange) {
+  if (!existsSync(path)) {
+    return null
+  }
+  return fsWatch(path, WATCH_RECURSIVE_OPTIONS, onChange)
+}
+
+function watchFile(path, onChange) {
+  if (!existsSync(path)) {
+    return null
+  }
+  return fsWatch(path, onChange)
+}
+
+function startWatch(onChange) {
+  const watchers = [
+    watchDir(SRC, onChange),
+    watchDir(ICONS, onChange),
+    watchFile(MANIFEST, onChange),
+  ].filter(Boolean)
+
+  return function () {
+    for (const watcher of watchers) {
+      watcher.close()
+    }
+  }
+}
+
+async function run() {
+  const args = process.argv.slice(2)
+  const isWatch = hasWatchFlag(args)
+
+  clean(DIST)
+  ensure(DIST)
+
+  if (!isWatch) {
+    await buildAll(false)
+    return
+  }
+
+  const runBuild = createBuildQueue(() => buildAll(true))
+  const onChange = createDebounced(runBuild, WATCH_DEBOUNCE_MS)
+  await runBuild()
+  startWatch(onChange)
+  console.log(WATCH_MESSAGE)
+  await new Promise(() => {})
 }
 
 run().catch((error) => {

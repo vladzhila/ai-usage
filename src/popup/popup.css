@@ -45,7 +45,18 @@ body {
   background: var(--bg);
   font-family: var(--sans);
   color: var(--text);
-  overflow: hidden;
+  overflow: auto;
+}
+
+html,
+body {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .container {

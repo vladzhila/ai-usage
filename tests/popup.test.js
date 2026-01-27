@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import {
   formatSessionReset,
   formatWeeklyReset,
@@ -149,6 +150,14 @@ const POPUP_BODY_HTML = `
     </div>
   </div>
 `
+
+describe('Popup - styles', () => {
+  test('hides scrollbar while keeping scroll', () => {
+    const css = readFileSync(new URL('../src/popup/popup.css', import.meta.url), 'utf8')
+    expect(css.includes('scrollbar-width: none')).toBe(true)
+    expect(css.includes('::-webkit-scrollbar')).toBe(true)
+  })
+})
 
 const testWindow = new Window()
 let popupLoaded = false

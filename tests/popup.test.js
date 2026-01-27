@@ -96,10 +96,10 @@ const POPUP_BODY_HTML = `
       <div data-field="weekly-bar"></div>
       <div class="row" data-row="weekly-reset"><div data-field="weekly-reset"></div></div>
     </div>
-    <div data-section="opus">
-      <div data-field="opus-used"></div>
-      <div data-field="opus-bar"></div>
-      <div class="row" data-row="opus-reset"><div data-field="opus-reset"></div></div>
+    <div data-section="sonnet">
+      <div data-field="sonnet-used"></div>
+      <div data-field="sonnet-bar"></div>
+      <div class="row" data-row="sonnet-reset"><div data-field="sonnet-reset"></div></div>
     </div>
     <div data-section="extra">
       <div data-field="extra-used"></div>
@@ -233,6 +233,7 @@ function buildClaudeResult(data) {
       fiveHour: { used: 10, reset: Date.now() + 60 * 60 * 1000 },
       weekly: null,
       opus: null,
+      sonnet: null,
       extra: { enabled: false, used: 0, limit: 0 },
       ...data,
     },
@@ -525,6 +526,7 @@ describe('Popup - DOM updates', () => {
             fiveHour: { used: 15, reset: Date.now() + 60 * 60 * 1000 },
             weekly: null,
             opus: null,
+            sonnet: null,
             extra: { enabled: true, used: 12.3, limit: 45.6 },
           },
         },
@@ -758,21 +760,21 @@ describe('Popup - DOM updates', () => {
     expect(cursorUsage.textContent).toBe('30')
   })
 
-  test('updates Claude weekly and opus sections', async () => {
+  test('updates Claude weekly and sonnet sections', async () => {
     const doc = await setupPopup({
       storage: { showClaude: true, showCodex: false, showCursor: false },
       result: buildResult({
         claude: buildClaudeResult({
           weekly: { used: 40, reset: Date.now() + 2 * 60 * 60 * 1000 },
-          opus: { used: 55, reset: Date.now() + 3 * 60 * 60 * 1000 },
+          sonnet: { used: 55, reset: Date.now() + 3 * 60 * 60 * 1000 },
         }),
       }),
     })
 
     const weeklySection = doc.querySelector('[data-service="claude"] [data-section="weekly"]')
-    const opusSection = doc.querySelector('[data-service="claude"] [data-section="opus"]')
+    const sonnetSection = doc.querySelector('[data-service="claude"] [data-section="sonnet"]')
     expect(weeklySection.style.display).toBe('block')
-    expect(opusSection.style.display).toBe('block')
+    expect(sonnetSection.style.display).toBe('block')
   })
 
   test('hides Codex credits section when no credits', async () => {

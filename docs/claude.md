@@ -59,12 +59,13 @@ Heuristics:
 - **Only Max and Ultra plans** (null otherwise)
 - Field: `seven_day_opus.utilization` (0-100%)
 - Reset: `seven_day_opus.resets_at` (ISO timestamp)
+- Tracked in data but not displayed in UI
 
 ### Sonnet (7-day model-specific)
 
 - **Only Max and Ultra plans** (null otherwise)
 - Field: `seven_day_sonnet.utilization` (0-100%)
-- Tracked in data but not displayed in UI
+- Reset: `seven_day_sonnet.resets_at` (ISO timestamp)
 
 ## Extra Usage (Overage)
 
@@ -85,7 +86,7 @@ Shows additional spend beyond subscription limits.
     plan: 'Max' | 'Pro' | 'Team' | 'Enterprise' | 'Ultra' | 'Free',
     fiveHour: { used: 45, reset: 'ISO-timestamp' },
     weekly: { used: 30, reset: 'ISO-timestamp' },    // Max/Ultra only, null otherwise
-    opus: { used: 20, reset: 'ISO-timestamp' },      // Max/Ultra only, null otherwise
+    opus: { used: 20, reset: 'ISO-timestamp' },      // Max/Ultra only, null otherwise (not displayed)
     sonnet: { used: 10, reset: 'ISO-timestamp' },    // Max/Ultra only, null otherwise
     extra: { enabled: true, used: 5.50, limit: 20.00 }
   }
@@ -141,7 +142,7 @@ Shows additional spend beyond subscription limits.
 - `organizations[0].capabilities` -> fallback plan detection (`claude_pro`)
 - `usage.five_hour` -> `data.fiveHour`
 - `usage.seven_day` -> `data.weekly` (Max/Ultra only)
-- `usage.seven_day_opus` -> `data.opus` (Max/Ultra only)
+- `usage.seven_day_opus` -> `data.opus` (Max/Ultra only, not displayed)
 - `usage.seven_day_sonnet` -> `data.sonnet` (Max/Ultra only)
 - `overage_spend_limit.is_enabled` -> `data.extra.enabled`
 - `overage_spend_limit.used_credits` -> `data.extra.used` (cents to dollars)

@@ -257,7 +257,7 @@ function formatDollars(amount) {
 }
 
 function updateClaudeCard(card, data) {
-  const { fiveHour, weekly, opus, extra = {} } = data
+  const { fiveHour, weekly, sonnet, extra = {} } = data
 
   if (fiveHour) {
     updateWindow(card, 'session', fiveHour, formatSessionReset)
@@ -268,9 +268,9 @@ function updateClaudeCard(card, data) {
     updateWeeklyWindow(card, 'weekly', weekly)
   }
 
-  showSection(card, 'opus', opus)
-  if (opus) {
-    updateWeeklyWindow(card, 'opus', opus)
+  showSection(card, 'sonnet', sonnet)
+  if (sonnet) {
+    updateWeeklyWindow(card, 'sonnet', sonnet)
   }
 
   showSection(card, 'extra', extra.enabled)

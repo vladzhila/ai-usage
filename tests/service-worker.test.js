@@ -415,10 +415,11 @@ describe('fetchClaude', () => {
     expect(result.data.fiveHour.reset).toBe('2025-01-01T00:00:00Z')
     expect(result.data.weekly).toBeNull()
     expect(result.data.opus).toBeNull()
+    expect(result.data.sonnet).toBeNull()
     expect(result.data.extra.enabled).toBe(false)
   })
 
-  test('returns Max plan with opus window and extra spend', async () => {
+  test('returns Max plan with opus and sonnet windows and extra spend', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 
     mockFetch.mockImplementation(
@@ -467,6 +468,7 @@ describe('fetchClaude', () => {
     expect(result.data.fiveHour.used).toBe(10)
     expect(result.data.weekly).toBeNull()
     expect(result.data.opus).toBeNull()
+    expect(result.data.sonnet).toBeNull()
   })
 
   test('gracefully handles overage endpoint failure', async () => {

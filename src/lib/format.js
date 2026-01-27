@@ -8,27 +8,6 @@ const MIN_MINUTES = 1
 const TIME_SEPARATOR = ':'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Format reset time as relative (Xh Xm)
-export function formatReset(timestamp) {
-  if (!timestamp) {
-    return ''
-  }
-
-  const diff = new Date(timestamp) - new Date()
-
-  if (diff <= 0) {
-    return 'now'
-  }
-
-  const hours = Math.floor(diff / MS_PER_HOUR)
-  const mins = Math.floor((diff % MS_PER_HOUR) / MS_PER_MINUTE)
-
-  if (hours > 0) {
-    return `${hours}h ${mins}m`
-  }
-  return `${mins}m`
-}
-
 // Format time as 12-hour (2:05 PM)
 function formatTime12h(date) {
   const hours24 = date.getHours()

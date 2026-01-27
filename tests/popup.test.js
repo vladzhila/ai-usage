@@ -1,6 +1,5 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import {
-  formatReset,
   formatSessionReset,
   formatWeeklyReset,
   formatCountdown,
@@ -269,35 +268,6 @@ describe('Popup - getUsagePercent', () => {
 
   test('caps usage at 100%', () => {
     expect(getUsagePercent(200, 100)).toBe(100)
-  })
-})
-
-describe('Popup - formatReset', () => {
-  test('returns empty for null timestamp', () => {
-    expect(formatReset(null)).toBe('')
-  })
-
-  test('returns "now" for past timestamp', () => {
-    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
-    withMockedDate(now, () => {
-      expect(formatReset(now - 1000)).toBe('now')
-    })
-  })
-
-  test('formats hours and minutes', () => {
-    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
-    withMockedDate(now, () => {
-      const future = now + 2 * 60 * 60 * 1000 + 30 * 60 * 1000
-      expect(formatReset(future)).toBe('2h 30m')
-    })
-  })
-
-  test('formats minutes only when less than hour', () => {
-    const now = Date.UTC(2026, 0, 20, 12, 0, 0)
-    withMockedDate(now, () => {
-      const future = now + 45 * 60 * 1000
-      expect(formatReset(future)).toBe('45m')
-    })
   })
 })
 

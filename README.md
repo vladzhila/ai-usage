@@ -4,8 +4,6 @@ Chrome extension that tracks usage limits across Claude, Codex, and Cursor in a 
 
 ![Screenshot](docs/screenshot.png)
 
-<!-- TODO: Add actual screenshot -->
-
 ## Features
 
 - **Unified dashboard** — View all AI service limits in one place

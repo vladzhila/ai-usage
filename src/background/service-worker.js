@@ -7,11 +7,12 @@ import {
   setCache,
   isCacheValid,
   fetchClaude,
-  fetchCursor,
+  parseCursorSummary,
   formatCodexPlan,
   parseLegacyCursor,
 } from './service-worker-core.js'
 import { startDevReload } from './dev-reload.js'
+import { CACHE_FALLBACK_MESSAGE, FETCH_FALLBACK_MESSAGE } from '../lib/constants.js'
 
 const CHATGPT_URL = 'https://chatgpt.com'
 const CHATGPT_SESSION_URL = `${CHATGPT_URL}/api/auth/session`
@@ -22,9 +23,6 @@ const CURSOR_LEGACY_URL = 'https://cursor.com/api/usage'
 const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
 const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
 const CODEX_TOKEN_MESSAGE = 'No access token in session'
-
-const CACHE_FALLBACK_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.'
-const FALLBACK_ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
 
 async function fetchCodex() {
   const cookie = await getCookie('chatgpt')
@@ -133,7 +131,7 @@ async function fetchCursorUsage() {
       }
     }
 
-    return fetchCursor({ usage: usageData, user: userData })
+    return parseCursorSummary({ usage: usageData, user: userData })
   } catch {
     return { status: 'error', message: 'Refresh cursor.com tab' }
   }
@@ -142,7 +140,7 @@ async function fetchCursorUsage() {
 function normalizeResult(result) {
   return result.status === 'fulfilled'
     ? result.value
-    : { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+    : { status: 'error', message: FETCH_FALLBACK_MESSAGE }
 }
 
 function hasFailure(results) {
@@ -211,7 +209,7 @@ async function safeFetchAll(force, visibility) {
       return buildResponse(visibility, cache, CACHE_META)
     }
 
-    const errorResult = { status: 'error', message: FALLBACK_ERROR_MESSAGE }
+    const errorResult = { status: 'error', message: FETCH_FALLBACK_MESSAGE }
     return buildResponse(visibility, {
       claude: errorResult,
       codex: errorResult,

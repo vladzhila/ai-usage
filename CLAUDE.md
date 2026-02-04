@@ -17,6 +17,7 @@ bun test --coverage  # Test with coverage
 bun run lint         # ESLint check
 bun run lint:fix     # ESLint autofix
 bun run format       # Prettier format all
+bun run format:check # Check formatting
 ```
 
 ## Architecture
@@ -31,6 +32,7 @@ bun run format       # Prettier format all
 - `src/lib/constants.js` - Time constants, usage thresholds
 - `src/lib/format.js` - Time formatting utilities
 - `src/lib/visibility.js` - Provider visibility state management
+- `src/background/dev-reload.js` - Dev mode auto-reload polling
 
 **Provider APIs**:
 
@@ -56,7 +58,7 @@ bun run format       # Prettier format all
 
 Tests in `tests/` use `bun:test`. Chrome APIs mocked in `tests/mocks/chrome.js`.
 
-Mock helpers: `setCookie(url, name, value)`, `setStorage(key, value)`, `clearMocks()`
+Mock helpers: `setCookie(url, name, value)`, `setStorage(key, value)`, `getStorage(key)`, `clearMocks()`
 
 ## Pre-commit Hook
 

@@ -21,7 +21,7 @@ import {
   setCache,
   isCacheValid,
   fetchClaude,
-  fetchCursor,
+  parseCursorSummary,
   formatCodexPlan,
   parseLegacyCursor,
 } from '../src/background/service-worker-core.js'
@@ -304,9 +304,9 @@ describe('fetchClaude', () => {
   })
 })
 
-describe('fetchCursor', () => {
+describe('parseCursorSummary', () => {
   test('returns payload error when status is not ok', () => {
-    const result = fetchCursor({ status: 'error', message: 'nope' })
+    const result = parseCursorSummary({ status: 'error', message: 'nope' })
     expect(result.status).toBe('error')
     expect(result.message).toBe('nope')
   })
@@ -636,14 +636,14 @@ const CURSOR_USER_RESPONSE = {
   email: 'user@example.com',
 }
 
-describe('fetchCursor', () => {
+describe('parseCursorSummary', () => {
   test('returns error for missing payload', () => {
-    const result = fetchCursor()
+    const result = parseCursorSummary()
     expect(result.status).toBe('error')
   })
 
   test('returns usage data on success', () => {
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: CURSOR_USAGE_RESPONSE,
       user: CURSOR_USER_RESPONSE,
     })
@@ -656,7 +656,7 @@ describe('fetchCursor', () => {
   })
 
   test('formats pro_plus plan', () => {
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: { ...CURSOR_USAGE_RESPONSE, membershipType: 'pro_plus' },
       user: CURSOR_USER_RESPONSE,
     })
@@ -666,7 +666,7 @@ describe('fetchCursor', () => {
   })
 
   test('formats ultra plan', () => {
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: { ...CURSOR_USAGE_RESPONSE, membershipType: 'ultra' },
       user: CURSOR_USER_RESPONSE,
     })
@@ -690,7 +690,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageWithBreakdown,
       user: CURSOR_USER_RESPONSE,
     })
@@ -710,7 +710,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageWithPercent,
       user: CURSOR_USER_RESPONSE,
     })
@@ -730,7 +730,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageWithPercent,
       user: CURSOR_USER_RESPONSE,
     })
@@ -751,7 +751,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageWithOnDemand,
       user: CURSOR_USER_RESPONSE,
     })
@@ -772,7 +772,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageWithOnDemandNoLimit,
       user: CURSOR_USER_RESPONSE,
     })
@@ -794,7 +794,7 @@ describe('fetchCursor', () => {
       },
     }
 
-    const result = fetchCursor({
+    const result = parseCursorSummary({
       usage: usageOver100,
       user: CURSOR_USER_RESPONSE,
     })

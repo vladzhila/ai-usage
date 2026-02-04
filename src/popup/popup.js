@@ -3,7 +3,12 @@ import {
   getUsagePercent,
   formatWeeklyResetWithCountdown,
 } from '../lib/format.js'
-import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../lib/constants.js'
+import {
+  THRESHOLD_DANGER,
+  THRESHOLD_WARNING,
+  CACHE_FALLBACK_MESSAGE,
+  FETCH_FALLBACK_MESSAGE,
+} from '../lib/constants.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
 const THEME_KEY = 'theme'
@@ -139,14 +144,6 @@ async function initOrder() {
     item.addEventListener('dragleave', onDragLeave)
     item.addEventListener('drop', onDrop)
   })
-}
-
-function forEachVisible(visibility, callback) {
-  for (const s of SERVICES) {
-    if (visibility[s.name]) {
-      callback(s.name)
-    }
-  }
 }
 
 function applyVisibility(visibility) {
@@ -358,8 +355,6 @@ function updateCard(service, result) {
 }
 
 const SPIN_DELAY_MS = 300
-const NOTICE_MESSAGE = 'Fetch failed — showing cached data. Try updating manually.'
-const ERROR_MESSAGE = 'Fetch failed. Try updating manually.'
 const NOTICE_ID = 'notice'
 
 function setNotice(message) {
@@ -387,7 +382,11 @@ async function fetchData(force = false) {
 
   const visibility = await getVisibility()
 
-  forEachVisible(visibility, (name) => showState(name, 'loading'))
+  for (const s of SERVICES) {
+    if (visibility[s.name]) {
+      showState(s.name, 'loading')
+    }
+  }
 
   chrome.runtime
     .sendMessage({ type: 'FETCH_USAGE', force, visibility })
@@ -403,14 +402,18 @@ async function fetchData(force = false) {
       }
 
       if (result?.meta?.cache) {
-        setNotice(result.meta.message || NOTICE_MESSAGE)
+        setNotice(result.meta.message || CACHE_FALLBACK_MESSAGE)
         return
       }
 
       setNotice('')
     })
     .catch(() => {
-      forEachVisible(visibility, (name) => setError(name, ERROR_MESSAGE))
+      for (const s of SERVICES) {
+        if (visibility[s.name]) {
+          setError(s.name, FETCH_FALLBACK_MESSAGE)
+        }
+      }
       setNotice('')
     })
     .finally(() => {

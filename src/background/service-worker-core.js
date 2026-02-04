@@ -245,7 +245,7 @@ function toPercent(used, limit) {
   return Math.round(ratio * PERCENT_MAX)
 }
 
-function parseCursorSummary(payload) {
+export function parseCursorSummary(payload) {
   if (!payload) {
     return { status: 'error', message: CURSOR_DATA_ERROR }
   }
@@ -321,8 +321,4 @@ export function parseLegacyCursor(data, user) {
       legacy: { requests: used, max },
     },
   }
-}
-
-export function fetchCursor(payload) {
-  return parseCursorSummary(payload)
 }

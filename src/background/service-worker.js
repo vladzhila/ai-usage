@@ -24,7 +24,7 @@ const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
 const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
 const CODEX_TOKEN_MESSAGE = 'No access token in session'
 
-async function fetchCodex() {
+export async function fetchCodex() {
   const cookie = await getCookie('chatgpt')
 
   if (!isValid('chatgpt', cookie)) {
@@ -92,7 +92,7 @@ async function fetchCodex() {
   }
 }
 
-async function fetchCursorUsage() {
+export async function fetchCursorUsage() {
   const cookie = await getCookie('cursor')
 
   if (!isValid('cursor', cookie)) {
@@ -144,7 +144,7 @@ function normalizeResult(result) {
 }
 
 function hasFailure(results) {
-  return results.some((r) => r.status === 'rejected' || r.value?.status === 'error')
+  return results.some((r) => r.status === 'rejected' || r.value?.status !== 'ok')
 }
 
 const HIDDEN_RESULT = { status: 'hidden' }
@@ -161,7 +161,10 @@ function buildResponse(visibility, data, meta) {
   return response
 }
 
-async function fetchAll(force = false, visibility = { claude: true, codex: true, cursor: true }) {
+export async function fetchAll(
+  force = false,
+  visibility = { claude: true, codex: true, cursor: true }
+) {
   const cache = await getCache()
   if (!force && isCacheValid(cache)) {
     return buildResponse(visibility, cache)
@@ -200,7 +203,7 @@ async function fetchAll(force = false, visibility = { claude: true, codex: true,
 
 const CACHE_META = { cache: true, message: CACHE_FALLBACK_MESSAGE }
 
-async function safeFetchAll(force, visibility) {
+export async function safeFetchAll(force, visibility) {
   try {
     return await fetchAll(force, visibility)
   } catch {

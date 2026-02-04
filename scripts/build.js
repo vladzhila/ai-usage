@@ -19,7 +19,7 @@ const ENTRYPOINTS = ['background/service-worker.js', 'popup/popup.js', 'popup/po
   (entry) => join(SRC, entry)
 )
 const STATICS = ['popup', 'background', 'lib']
-const ICON_SIZES = [16, 48, 128]
+const ICON_SIZES = [16, 32, 48, 128]
 const DEV_RELOAD_FILE = 'dev-reload.json'
 const DEV_RELOAD_KEY = 'stamp'
 const WATCH_DEBOUNCE_MS = 100
@@ -87,7 +87,7 @@ async function icons(from, to) {
   }
 
   for (const size of ICON_SIZES) {
-    await Bun.write(join(to, `icon${size}.png`), MIN_PNG)
+    await Bun.write(join(to, `${size}.png`), MIN_PNG)
   }
   console.log(ICON_MESSAGE)
 }

@@ -47,12 +47,13 @@ Unknown types are title-cased.
 
 ## Usage Windows
 
-### Session (3-hour)
+### Session (primary window)
 
 - Field: `rate_limit.primary_window`
 - Usage: `used_percent` (0-100%)
 - Reset: `reset_at` (Unix timestamp in seconds, converted to ms)
 - If the window is missing, `used` defaults to 0 and `reset` is null
+- Window length is defined by the API
 
 ### Weekly (7-day)
 
@@ -140,7 +141,8 @@ API credits for additional usage beyond subscription limits.
 - `src/popup/popup.js` - `updateCard()` Codex section with dual windows + credits
 - `src/popup/popup.html` - Codex card template
 - `src/lib/format.js` - `formatSessionReset()`, `formatWeeklyResetWithCountdown()`
-- `tests/service-worker.test.js` - Codex API + `formatCodexPlan()` tests
+- `tests/service-worker-runtime.test.js` - `fetchCodex()` behavior and cache fallback coverage
+- `tests/service-worker.test.js` - `formatCodexPlan()` tests
 
 ## Limitations
 

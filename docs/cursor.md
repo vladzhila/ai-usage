@@ -44,10 +44,10 @@ Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `i
 ### Billing Cycle (monthly)
 
 - Single window based on monthly billing cycle
-- Usage: `individualUsage.plan.used` (cents)
-- Limit: `individualUsage.plan.limit` (cents)
+- Usage: `individualUsage.plan.used` (raw units)
+- Limit: `individualUsage.plan.limit` (raw units)
 - Reset: `billingCycleEnd` (ISO 8601 timestamp, parsed via `Date.parse`, null if invalid)
-- Returned as percentage (can exceed 100%)
+- Returned as percentage (can exceed 100%); popup shows the percent while the bar width clamps at 100%
 - Falls back to `individualUsage.plan.totalPercentUsed` when plan limits are missing
 - `totalPercentUsed` may be 0-1 or 0-100 (normalized to 0-100)
 
@@ -175,10 +175,11 @@ Request-based usage for older Cursor plans.
 ## Key Files
 
 - `src/background/service-worker.js` - `fetchCursorUsage()`, API URLs, legacy fallback
-- `src/background/service-worker-core.js` - `fetchCursor()`, `parseCursorSummary()`, `parseLegacyCursor()`, `formatCursorPlan()`
-- `src/popup/popup.js` - `updateCard()` Cursor section with breakdown/legacy/team
+- `src/background/service-worker-core.js` - `parseCursorSummary()`, `parseLegacyCursor()`, `formatCursorPlan()`
+- `src/popup/popup.js` - Cursor section with on-demand + legacy display
 - `src/popup/popup.html` - Cursor card template
-- `tests/service-worker.test.js` - Cursor API + `parseLegacyCursor()` tests
+- `tests/service-worker-runtime.test.js` - `fetchCursorUsage()` behavior + legacy fallback tests
+- `tests/service-worker.test.js` - `parseCursorSummary()` + `parseLegacyCursor()` tests
 
 ## Limitations
 

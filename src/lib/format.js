@@ -90,6 +90,9 @@ export function formatCountdown(timestamp) {
   }
 
   const ms = toMs(timestamp)
+  if (Number.isNaN(ms)) {
+    return ''
+  }
   const diff = ms - Date.now()
 
   if (diff <= 0) {

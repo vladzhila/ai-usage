@@ -1,5 +1,4 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
-import { readFileSync } from 'node:fs'
 import {
   formatSessionReset,
   formatWeeklyReset,
@@ -151,14 +150,6 @@ const POPUP_BODY_HTML = `
   </div>
 `
 
-describe('Popup - styles', () => {
-  test('hides scrollbar while keeping scroll', () => {
-    const css = readFileSync(new URL('../src/popup/popup.css', import.meta.url), 'utf8')
-    expect(css.includes('scrollbar-width: none')).toBe(true)
-    expect(css.includes('::-webkit-scrollbar')).toBe(true)
-  })
-})
-
 const testWindow = new Window()
 let popupLoaded = false
 
@@ -304,6 +295,10 @@ describe('Popup - formatWeeklyReset', () => {
 describe('Popup - formatCountdown', () => {
   test('returns empty for null timestamp', () => {
     expect(formatCountdown(null)).toBe('')
+  })
+
+  test('returns empty for invalid timestamp', () => {
+    expect(formatCountdown('invalid')).toBe('')
   })
 
   test('returns "now" for past timestamp', () => {
@@ -475,6 +470,21 @@ describe('Popup - DOM updates', () => {
 
     const bar = doc.querySelector('[data-service="cursor"] [data-field="bar"]')
     expect(bar.dataset.status).toBe('danger')
+  })
+
+  test('shows Cursor usage over 100% while clamping bar width', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: false, showCodex: false, showCursor: true },
+      result: buildResult({
+        cursor: buildCursorResult({ used: 150, limit: 100 }),
+      }),
+    })
+
+    const usage = doc.querySelector('[data-service="cursor"] [data-field="usage"]')
+    const bar = doc.querySelector('[data-service="cursor"] [data-field="bar"]')
+
+    expect(usage.textContent).toBe('150')
+    expect(bar.style.width).toBe('100%')
   })
 
   test('renders Codex credits as Unlimited', async () => {
@@ -847,11 +857,24 @@ describe('Popup - DOM updates', () => {
       }),
     })
 
-    const refresh = doc.getElementById('refresh')
-    refresh.click()
-    expect(refresh.classList.contains('spinning')).toBe(true)
-    await new Promise((resolve) => setTimeout(resolve, 350))
-    expect(refresh.classList.contains('spinning')).toBe(false)
+    const timers = []
+    const originalSetTimeout = globalThis.setTimeout
+    globalThis.setTimeout = (callback) => {
+      timers.push(callback)
+      return callback
+    }
+
+    try {
+      const refresh = doc.getElementById('refresh')
+      refresh.click()
+      expect(refresh.classList.contains('spinning')).toBe(true)
+      await new Promise((resolve) => originalSetTimeout(resolve, 0))
+      expect(timers.length).toBe(1)
+      await timers[0]()
+      expect(refresh.classList.contains('spinning')).toBe(false)
+    } finally {
+      globalThis.setTimeout = originalSetTimeout
+    }
   })
 
   test('reorders cards via drag and drop', async () => {

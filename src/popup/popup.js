@@ -1,8 +1,4 @@
-import {
-  formatSessionReset,
-  getUsagePercent,
-  formatWeeklyResetWithCountdown,
-} from '../lib/format.js'
+import { formatSessionReset, formatWeeklyResetWithCountdown } from '../lib/format.js'
 import {
   THRESHOLD_DANGER,
   THRESHOLD_WARNING,
@@ -14,6 +10,7 @@ import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '.
 const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
+const PERCENT_MAX = 100
 const WARNING_PERCENT = THRESHOLD_WARNING * 100
 const DANGER_PERCENT = THRESHOLD_DANGER * 100
 
@@ -295,10 +292,11 @@ function updateCodexCard(card, data) {
 function updateCursorCard(card, data) {
   const used = data.used || 0
   const limit = data.limit || 0
-  const percent = getUsagePercent(used, limit)
+  const percent = limit > 0 ? Math.round((used / limit) * PERCENT_MAX) : 0
+  const barPercent = Math.min(PERCENT_MAX, percent)
 
   setField(card, 'usage', percent)
-  updateBar(card, 'bar', percent)
+  updateBar(card, 'bar', barPercent)
   setResetField(card, 'reset', data.reset, formatWeeklyResetWithCountdown)
 
   const onDemand = data.onDemand || 0

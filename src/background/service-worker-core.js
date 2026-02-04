@@ -33,6 +33,7 @@ const CODEX_PLAN_LABELS = {
 
 const CURSOR_PLAN_LABELS = {
   free: 'Free',
+  cursor_free: 'Free',
   enterprise: 'Enterprise',
   pro: 'Pro',
   pro_plus: 'Pro+',

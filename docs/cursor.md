@@ -26,16 +26,17 @@ Primary endpoints called in parallel. Legacy endpoint used as fallback when `ind
 
 Plan is detected from `membershipType` in usage response:
 
-| Type         | Display    |
-| ------------ | ---------- |
-| `free`       | Free       |
-| `pro`        | Pro        |
-| `pro_plus`   | Pro+       |
-| `ultra`      | Ultra      |
-| `hobby`      | Hobby      |
-| `team`       | Team       |
-| `enterprise` | Enterprise |
-| (legacy)     | Legacy     |
+| Type          | Display    |
+| ------------- | ---------- |
+| `free`        | Free       |
+| `cursor_free` | Free       |
+| `pro`         | Pro        |
+| `pro_plus`    | Pro+       |
+| `ultra`       | Ultra      |
+| `hobby`       | Hobby      |
+| `team`        | Team       |
+| `enterprise`  | Enterprise |
+| (legacy)      | Legacy     |
 
 Unknown types are title-cased. Fallback: "Cursor". Legacy plans detected when `individualUsage` is missing and `sub` is available.
 

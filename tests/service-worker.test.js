@@ -750,6 +750,16 @@ describe('parseCursorSummary', () => {
     expect(result.data.plan).toBe('Ultra')
   })
 
+  test('formats cursor_free plan as Free', () => {
+    const result = parseCursorSummary({
+      usage: { ...CURSOR_USAGE_RESPONSE, membershipType: 'cursor_free' },
+      user: CURSOR_USER_RESPONSE,
+    })
+
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Free')
+  })
+
   test('prefers plan limit over breakdown total', () => {
     const usageWithBreakdown = {
       billingCycleEnd: '2026-01-30T14:19:04.000Z',

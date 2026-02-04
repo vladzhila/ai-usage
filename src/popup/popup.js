@@ -4,13 +4,13 @@ import {
   THRESHOLD_WARNING,
   CACHE_FALLBACK_MESSAGE,
   FETCH_FALLBACK_MESSAGE,
+  PERCENT_MAX,
 } from '../lib/constants.js'
 import { SERVICES, parseVisibility, isAllHidden, ORDER_KEY, parseOrder } from '../lib/visibility.js'
 
 const THEME_KEY = 'theme'
 const DARK = 'dark'
 const LIGHT = 'light'
-const PERCENT_MAX = 100
 const WARNING_PERCENT = THRESHOLD_WARNING * 100
 const DANGER_PERCENT = THRESHOLD_DANGER * 100
 

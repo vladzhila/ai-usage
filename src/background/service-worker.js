@@ -201,15 +201,13 @@ export async function fetchAll(
   return result
 }
 
-const CACHE_META = { cache: true, message: CACHE_FALLBACK_MESSAGE }
-
 export async function safeFetchAll(force, visibility) {
   try {
     return await fetchAll(force, visibility)
   } catch {
     const cache = await getCache()
     if (cache) {
-      return buildResponse(visibility, cache, CACHE_META)
+      return buildResponse(visibility, cache, { cache: true, message: CACHE_FALLBACK_MESSAGE })
     }
 
     const errorResult = { status: 'error', message: FETCH_FALLBACK_MESSAGE }

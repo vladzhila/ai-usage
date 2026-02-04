@@ -23,7 +23,7 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 
 ## Plan Detection
 
-Plan is detected from `rate_limit_tier` in account response, with heuristics:
+Plan is detected from `rate_limit_tier` (checked in org first, then account), with heuristics:
 
 | Tier                | Display    |
 | ------------------- | ---------- |
@@ -33,12 +33,16 @@ Plan is detected from `rate_limit_tier` in account response, with heuristics:
 | `claude_enterprise` | Enterprise |
 | `claude_ultra`      | Ultra      |
 
-Heuristics:
+Heuristics (in order):
 
-- If `rate_limit_tier` is missing or unrecognized, but contains `ultra` (case-insensitive), returns Ultra.
-- If `billing_type` indicates paid (e.g., `stripe`) and the tier is missing or Claude-like, returns Pro.
-- If `capabilities` includes `claude_pro`, returns Pro.
-- Otherwise returns Free.
+1. Exact match in tier table above.
+2. If tier contains `ultra` (e.g., `default_claude_ultra_5x`), returns Ultra.
+3. If tier contains `max` (e.g., `default_claude_max_5x`, `default_claude_max_20x`), returns Max.
+4. If `capabilities` includes `claude_ultra`, returns Ultra.
+5. If `capabilities` includes `claude_max`, returns Max.
+6. If `capabilities` includes `claude_pro`, returns Pro.
+7. If `billing_type` indicates paid (e.g., `stripe`) and tier is missing or Claude-like, returns Pro.
+8. Otherwise returns Free.
 
 ## Usage Windows
 
@@ -101,7 +105,9 @@ Shows additional spend beyond subscription limits.
 ;[
   {
     uuid: 'org-123',
-    capabilities: ['claude_pro'],
+    rate_limit_tier: 'default_claude_max_5x',
+    capabilities: ['chat', 'claude_max'],
+    billing_type: 'stripe_subscription',
   },
 ]
 ```
@@ -139,7 +145,8 @@ Shows additional spend beyond subscription limits.
 ### Raw -> Normalized Mapping
 
 - `organizations[0].uuid` -> used to build `/api/organizations/{id}` URLs
-- `organizations[0].capabilities` -> fallback plan detection (`claude_pro`)
+- `organizations[0].rate_limit_tier` -> primary plan detection (e.g., `default_claude_max_5x`)
+- `organizations[0].capabilities` -> fallback plan detection (`claude_max`, `claude_ultra`, `claude_pro`)
 - `usage.five_hour` -> `data.fiveHour`
 - `usage.seven_day` -> `data.weekly` (Max/Ultra only)
 - `usage.seven_day_opus` -> `data.opus` (Max/Ultra only, not displayed)
@@ -147,7 +154,7 @@ Shows additional spend beyond subscription limits.
 - `overage_spend_limit.is_enabled` -> `data.extra.enabled`
 - `overage_spend_limit.used_credits` -> `data.extra.used` (cents to dollars)
 - `overage_spend_limit.monthly_credit_limit` -> `data.extra.limit` (cents to dollars)
-- `account.rate_limit_tier` + `account.billing_type` + `organizations[0].capabilities` -> `data.plan`
+- `org.rate_limit_tier` || `account.rate_limit_tier` + `account.billing_type` + `org.capabilities` -> `data.plan`
 
 ## Error States
 

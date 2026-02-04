@@ -1,9 +1,10 @@
+import { PERCENT_MAX } from '../lib/constants.js'
+
 export const CACHE_KEY = 'usage_cache'
 export const CACHE_TTL = 60000
 export const FETCH_ERROR_MESSAGE = 'Fetch failed'
 
 const CURSOR_DATA_ERROR = 'No Cursor data'
-const PERCENT_MAX = 100
 const CENTS_PER_DOLLAR = 100
 
 const CLAUDE_PLAN_LABELS = {
@@ -168,14 +169,29 @@ function parseOverage(data) {
 
 // Heuristics for Claude plan when tier is missing.
 function detectPlan(account, org) {
-  const tier = account?.rate_limit_tier
+  const tier = org?.rate_limit_tier || account?.rate_limit_tier
   const normalizedTier = tier ? String(tier).toLowerCase() : ''
   const known = normalizedTier ? CLAUDE_PLAN_LABELS[normalizedTier] : null
   if (known) {
     return known
   }
+
   if (normalizedTier.includes('ultra')) {
     return 'Ultra'
+  }
+  if (normalizedTier.includes('max')) {
+    return 'Max'
+  }
+
+  const caps = org?.capabilities || []
+  if (caps.includes('claude_ultra')) {
+    return 'Ultra'
+  }
+  if (caps.includes('claude_max')) {
+    return 'Max'
+  }
+  if (caps.includes('claude_pro')) {
+    return 'Pro'
   }
 
   const billing = account?.billing_type ? String(account.billing_type).toLowerCase() : ''
@@ -183,10 +199,6 @@ function detectPlan(account, org) {
     return 'Pro'
   }
 
-  const caps = org?.capabilities || []
-  if (caps.includes('claude_pro')) {
-    return 'Pro'
-  }
   return 'Free'
 }
 

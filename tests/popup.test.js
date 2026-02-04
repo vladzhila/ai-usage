@@ -3,7 +3,6 @@ import {
   formatSessionReset,
   formatWeeklyReset,
   formatCountdown,
-  getUsagePercent,
   formatWeeklyResetWithCountdown,
 } from '../src/lib/format.js'
 import { THRESHOLD_DANGER, THRESHOLD_WARNING } from '../src/lib/constants.js'
@@ -255,21 +254,6 @@ function buildCodexResult(data) {
 
 beforeEach(() => {
   clearMocks()
-})
-
-describe('Popup - getUsagePercent', () => {
-  test('returns zero when limit is zero', () => {
-    expect(getUsagePercent(10, 0)).toBe(0)
-  })
-
-  test('rounds to nearest whole percent', () => {
-    expect(getUsagePercent(1, 3)).toBe(33)
-    expect(getUsagePercent(2, 3)).toBe(67)
-  })
-
-  test('caps usage at 100%', () => {
-    expect(getUsagePercent(200, 100)).toBe(100)
-  })
 })
 
 describe('Popup - formatWeeklyReset', () => {

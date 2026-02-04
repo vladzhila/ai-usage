@@ -3,7 +3,6 @@ import { MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from './constants.js'
 const MS_PER_SECOND = 1000
 // Heuristic to treat values as seconds vs ms.
 const MS_TIMESTAMP_THRESHOLD = 1000000000000
-const MAX_PERCENT = 100
 const MIN_MINUTES = 1
 const TIME_SEPARATOR = ':'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -71,16 +70,6 @@ export function formatWeeklyReset(timestamp) {
   const year = reset.getFullYear()
 
   return `${MONTHS[reset.getMonth()]} ${day}, ${year} ${formatTime12h(reset)}`
-}
-
-// Calculate usage percentage capped at 100
-export function getUsagePercent(used, limit) {
-  if (limit <= 0) {
-    return 0
-  }
-  const ratio = used / limit
-  const percent = Math.round(ratio * MAX_PERCENT)
-  return Math.min(MAX_PERCENT, percent)
 }
 
 // Format countdown as relative (Xd Xh or Xh Xm)

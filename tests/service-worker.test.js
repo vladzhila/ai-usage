@@ -583,6 +583,81 @@ describe('fetchClaude', () => {
     expect(result.data.plan).toBe('Enterprise')
   })
 
+  test('detects Max plan from org rate_limit_tier containing max', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', rate_limit_tier: 'default_claude_max_5x', capabilities: [] },
+        account: {},
+        usage: {
+          five_hour: { utilization: 20 },
+          seven_day: { utilization: 15 },
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Max')
+    expect(result.data.weekly.used).toBe(15)
+  })
+
+  test('detects Max plan from org rate_limit_tier with 20x suffix', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', rate_limit_tier: 'default_claude_max_20x', capabilities: [] },
+        account: {},
+        usage: {
+          five_hour: { utilization: 10 },
+          seven_day: { utilization: 5 },
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Max')
+  })
+
+  test('detects Max plan from capabilities when tier missing', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', capabilities: ['chat', 'claude_max'] },
+        account: {},
+        usage: { five_hour: { utilization: 30 } },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Max')
+  })
+
+  test('detects Ultra plan from capabilities when tier missing', async () => {
+    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
+
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        org: { uuid: 'org-123', capabilities: ['chat', 'claude_ultra'] },
+        account: {},
+        usage: {
+          five_hour: { utilization: 25 },
+          seven_day: { utilization: 10 },
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Ultra')
+    expect(result.data.weekly.used).toBe(10)
+  })
+
   test('returns extra disabled when is_enabled false', async () => {
     setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
 

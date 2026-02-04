@@ -109,7 +109,10 @@
         <article class="card" data-service="claude">
           <div class="card-head">
             <a class="name" href="https://claude.ai/settings/usage" target="_blank">Claude</a>
-            <span class="dot" data-status="loading"></span>
+            <div class="status">
+              <span class="badge" data-field="plan"></span>
+              <span class="dot" data-status="loading"></span>
+            </div>
           </div>
           <div class="card-body" data-state="loading">
             <div class="loader"></div>
@@ -124,10 +127,6 @@
             <p class="error" data-field="error">Error loading data</p>
           </div>
           <div class="card-body" data-state="ok" style="display: none">
-            <div class="row">
-              <span class="label">PLAN</span>
-              <span class="badge" data-field="plan">Pro</span>
-            </div>
             <div class="row">
               <span class="label">SESSION</span>
               <span class="value"><span data-field="session-used">0</span>%</span>
@@ -183,7 +182,10 @@
             <a class="name" href="https://chatgpt.com/codex/settings/usage" target="_blank"
               >Codex</a
             >
-            <span class="dot" data-status="loading"></span>
+            <div class="status">
+              <span class="badge" data-field="plan"></span>
+              <span class="dot" data-status="loading"></span>
+            </div>
           </div>
           <div class="card-body" data-state="loading">
             <div class="loader"></div>
@@ -198,10 +200,6 @@
             <p class="error" data-field="error">Error loading data</p>
           </div>
           <div class="card-body" data-state="ok" style="display: none">
-            <div class="row">
-              <span class="label">PLAN</span>
-              <span class="badge" data-field="plan">Plus</span>
-            </div>
             <div class="row">
               <span class="label">SESSION</span>
               <span class="value"><span data-field="session-used">0</span>%</span>
@@ -236,7 +234,10 @@
         <article class="card" data-service="cursor">
           <div class="card-head">
             <a class="name" href="https://cursor.com/dashboard" target="_blank">Cursor</a>
-            <span class="dot" data-status="loading"></span>
+            <div class="status">
+              <span class="badge" data-field="plan"></span>
+              <span class="dot" data-status="loading"></span>
+            </div>
           </div>
           <div class="card-body" data-state="loading">
             <div class="loader"></div>
@@ -252,10 +253,6 @@
             <p class="error" data-field="error">Error loading data</p>
           </div>
           <div class="card-body" data-state="ok" style="display: none">
-            <div class="row">
-              <span class="label">PLAN</span>
-              <span class="badge" data-field="plan">Pro</span>
-            </div>
             <div class="row">
               <span class="label">USAGE</span>
               <span class="value"><span data-field="usage">0</span>%</span>

@@ -2,7 +2,7 @@
 
 Chrome extension that tracks usage limits across Claude, Codex, and Cursor in a unified dashboard.
 
-![Screenshot](docs/screenshot.png)
+![Screenshot](images/screenshot.png)
 
 ## Features
 

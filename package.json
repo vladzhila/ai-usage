@@ -1,6 +1,6 @@
 {
   "name": "ai-usage",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Chrome extension to track AI service usage limits",
   "type": "module",
   "private": true,

@@ -4,13 +4,7 @@ Codex provider fetches usage data from chatgpt.com Web API using browser session
 
 ## Data Source
 
-Uses browser cookies (automatic via Chrome extension cookies API).
-
-**Cookie required:**
-
-- Name: `__Secure-next-auth.session-token` or `next-auth.session-token`
-- Domain: `chatgpt.com`
-- Value: any non-empty string
+Uses browser session cookies sent automatically via `fetch()` with `credentials: 'include'`. No explicit cookie check is performed; authentication is validated by the API response status.
 
 ## API Endpoints
 
@@ -20,7 +14,7 @@ Uses browser cookies (automatic via Chrome extension cookies API).
 | `GET /backend-api/wham/usage` | `plan_type`, `rate_limit` windows |
 
 The usage endpoint requires `Authorization: Bearer ${accessToken}` header.
-If the session response does not include `accessToken`, the provider returns `expired`.
+If the session response does not include `accessToken`, the provider returns `logged_out`.
 
 ## Plan Detection
 
@@ -130,14 +124,13 @@ API credits for additional usage beyond subscription limits.
 
 | Status       | Meaning                                                              |
 | ------------ | -------------------------------------------------------------------- |
-| `logged_out` | No valid session cookie found                                        |
-| `expired`    | Session or usage endpoint returned 401/403, or token missing         |
+| `logged_out` | API returned 401/403, or session token missing                       |
 | `error`      | API error or network issue (catch returns "Refresh chatgpt.com tab") |
 
 ## Key Files
 
 - `src/background/service-worker.js` - `fetchCodex()`, API URLs, credits parsing
-- `src/background/service-worker-core.js` - `formatCodexPlan()`, `getCookie()`, `isValid()`, cookie config
+- `src/background/service-worker-core.js` - `formatCodexPlan()`
 - `src/popup/popup.js` - `updateCard()` Codex section with dual windows + credits
 - `src/popup/popup.html` - Codex card template
 - `src/lib/format.js` - `formatSessionReset()`, `formatWeeklyResetWithCountdown()`

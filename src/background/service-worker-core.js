@@ -61,57 +61,6 @@ function formatCursorPlan(type) {
   return formatPlan(type, CURSOR_PLAN_LABELS, 'Cursor')
 }
 
-export const SERVICES = {
-  claude: {
-    urls: ['https://claude.ai'],
-    cookies: ['sessionKey'],
-    prefix: 'sk-ant-',
-  },
-  chatgpt: {
-    urls: ['https://chatgpt.com'],
-    cookies: ['__Secure-next-auth.session-token', 'next-auth.session-token'],
-    prefix: null,
-  },
-  cursor: {
-    urls: ['https://cursor.com', 'https://cursor.sh'],
-    cookies: [
-      'WorkosCursorSessionToken',
-      '__Secure-next-auth.session-token',
-      'next-auth.session-token',
-    ],
-    prefix: null,
-  },
-}
-
-export async function getCookie(service) {
-  const config = SERVICES[service]
-  if (!config) {
-    return null
-  }
-
-  for (const url of config.urls) {
-    for (const name of config.cookies) {
-      const cookie = await chrome.cookies.get({ url, name })
-      if (cookie?.value) {
-        return cookie.value
-      }
-    }
-  }
-
-  return null
-}
-
-export function isValid(service, value) {
-  if (!value) {
-    return false
-  }
-  const config = SERVICES[service]
-  if (config.prefix) {
-    return value.startsWith(config.prefix)
-  }
-  return true
-}
-
 export async function fetchJson(url) {
   const response = await fetch(url, { credentials: 'include' }).catch(() => null)
 
@@ -204,13 +153,10 @@ function detectPlan(account, org) {
 }
 
 export async function fetchClaude() {
-  const cookie = await getCookie('claude')
-
-  if (!isValid('claude', cookie)) {
+  const orgs = await fetchJson('https://claude.ai/api/organizations')
+  if (orgs.status === 'expired') {
     return { status: 'logged_out', message: 'Log into claude.ai to see usage' }
   }
-
-  const orgs = await fetchJson('https://claude.ai/api/organizations')
   if (orgs.status !== 'ok') {
     return orgs
   }
@@ -228,6 +174,9 @@ export async function fetchClaude() {
     fetchJson('https://claude.ai/api/account'),
   ])
 
+  if (usage.status === 'expired') {
+    return { status: 'logged_out', message: 'Log into claude.ai to see usage' }
+  }
   if (usage.status !== 'ok') {
     return usage
   }

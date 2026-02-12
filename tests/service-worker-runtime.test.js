@@ -1,5 +1,5 @@
 import { mock, beforeAll, beforeEach, describe, test, expect } from 'bun:test'
-import { createChromeMock, setCookie, setStorage, getStorage, clearMocks } from './mocks/chrome.js'
+import { createChromeMock, setStorage, getStorage, clearMocks } from './mocks/chrome.js'
 import { CACHE_KEY } from '../src/background/service-worker-core.js'
 import { CACHE_FALLBACK_MESSAGE, FETCH_FALLBACK_MESSAGE } from '../src/lib/constants.js'
 
@@ -48,27 +48,23 @@ beforeEach(() => {
 })
 
 describe('fetchCodex', () => {
-  test('returns logged_out when cookie missing', async () => {
-    const fetchMock = mock()
-    globalThis.fetch = fetchMock
-
-    const result = await state.serviceWorker.fetchCodex()
-
-    expect(result.status).toBe('logged_out')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  test('returns expired for unauthorized session', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
+  test('returns logged_out when session is unauthorized', async () => {
     globalThis.fetch = createFetchSequence([createResponse({ ok: false, status: 401 })])
 
     const result = await state.serviceWorker.fetchCodex()
 
-    expect(result.status).toBe('expired')
+    expect(result.status).toBe('logged_out')
+  })
+
+  test('returns logged_out for 403 session response', async () => {
+    globalThis.fetch = createFetchSequence([createResponse({ ok: false, status: 403 })])
+
+    const result = await state.serviceWorker.fetchCodex()
+
+    expect(result.status).toBe('logged_out')
   })
 
   test('returns error for non-ok session response', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
     globalThis.fetch = createFetchSequence([createResponse({ ok: false, status: 500 })])
 
     const result = await state.serviceWorker.fetchCodex()
@@ -77,18 +73,15 @@ describe('fetchCodex', () => {
     expect(result.message).toBe('Session HTTP 500')
   })
 
-  test('returns expired when access token is missing', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
+  test('returns logged_out when access token is missing', async () => {
     globalThis.fetch = createFetchSequence([createResponse({ ok: true, status: 200, data: {} })])
 
     const result = await state.serviceWorker.fetchCodex()
 
-    expect(result.status).toBe('expired')
-    expect(result.message).toBe('No access token in session')
+    expect(result.status).toBe('logged_out')
   })
 
-  test('returns expired for unauthorized usage response', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
+  test('returns logged_out for unauthorized usage response', async () => {
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: { accessToken: 'token' } }),
       createResponse({ ok: false, status: 403 }),
@@ -96,11 +89,10 @@ describe('fetchCodex', () => {
 
     const result = await state.serviceWorker.fetchCodex()
 
-    expect(result.status).toBe('expired')
+    expect(result.status).toBe('logged_out')
   })
 
   test('returns error for non-ok usage response', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: { accessToken: 'token' } }),
       createResponse({ ok: false, status: 502 }),
@@ -113,7 +105,6 @@ describe('fetchCodex', () => {
   })
 
   test('returns parsed usage data', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
     const usageData = {
       plan_type: 'plus',
       rate_limit: {
@@ -140,7 +131,6 @@ describe('fetchCodex', () => {
   })
 
   test('returns error when fetch throws', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
     globalThis.fetch = createFetchSequence([new Error('boom')])
 
     const result = await state.serviceWorker.fetchCodex()
@@ -151,18 +141,7 @@ describe('fetchCodex', () => {
 })
 
 describe('fetchCursorUsage', () => {
-  test('returns logged_out when cookie missing', async () => {
-    const fetchMock = mock()
-    globalThis.fetch = fetchMock
-
-    const result = await state.serviceWorker.fetchCursorUsage()
-
-    expect(result.status).toBe('logged_out')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  test('returns expired for unauthorized responses', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
+  test('returns logged_out when unauthorized', async () => {
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: false, status: 401 }),
       createResponse({ ok: true, status: 200, data: {} }),
@@ -170,11 +149,21 @@ describe('fetchCursorUsage', () => {
 
     const result = await state.serviceWorker.fetchCursorUsage()
 
-    expect(result.status).toBe('expired')
+    expect(result.status).toBe('logged_out')
+  })
+
+  test('returns logged_out for 403 responses', async () => {
+    globalThis.fetch = createFetchSequence([
+      createResponse({ ok: true, status: 200, data: {} }),
+      createResponse({ ok: false, status: 403 }),
+    ])
+
+    const result = await state.serviceWorker.fetchCursorUsage()
+
+    expect(result.status).toBe('logged_out')
   })
 
   test('returns error when usage lookup fails', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: false, status: 500 }),
       createResponse({ ok: true, status: 200, data: {} }),
@@ -187,7 +176,6 @@ describe('fetchCursorUsage', () => {
   })
 
   test('returns error when user lookup fails', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: { individualUsage: {} } }),
       createResponse({ ok: false, status: 500 }),
@@ -200,7 +188,6 @@ describe('fetchCursorUsage', () => {
   })
 
   test('uses legacy cursor endpoint when needed', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: {} }),
       createResponse({ ok: true, status: 200, data: { sub: 'user-1', email: 'legacy@test.com' } }),
@@ -219,7 +206,6 @@ describe('fetchCursorUsage', () => {
   })
 
   test('falls back to summary when legacy lookup fails', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: { membershipType: 'pro' } }),
       createResponse({ ok: true, status: 200, data: { sub: 'user-2', email: 'user@test.com' } }),
@@ -233,7 +219,6 @@ describe('fetchCursorUsage', () => {
   })
 
   test('returns parsed summary for non-legacy responses', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     const usageData = {
       membershipType: 'pro',
       billingCycleEnd: '2026-01-20T14:05:00Z',
@@ -252,7 +237,6 @@ describe('fetchCursorUsage', () => {
   })
 
   test('returns error when fetch throws', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
     globalThis.fetch = createFetchSequence([new Error('boom')])
 
     const result = await state.serviceWorker.fetchCursorUsage()
@@ -282,12 +266,13 @@ describe('fetchAll cache behavior', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  test('returns cached data when providers are logged out', async () => {
+  test('preserves logged_out status instead of using cache', async () => {
     const cached = {
       timestamp: 123,
       claude: { status: 'ok', data: { plan: 'Pro' } },
     }
     setStorage(CACHE_KEY, cached)
+    globalThis.fetch = createFetchSequence([createResponse({ ok: false, status: 401 })])
 
     const result = await state.serviceWorker.fetchAll(true, {
       claude: true,
@@ -295,15 +280,59 @@ describe('fetchAll cache behavior', () => {
       cursor: false,
     })
 
+    expect(result.claude.status).toBe('logged_out')
+    expect(result.meta).toBeUndefined()
+    expect(getStorage(CACHE_KEY).timestamp).toBe(123)
+  })
+
+  test('preserves logged_out and does not fall back to cache', async () => {
+    const cached = {
+      timestamp: 123,
+      claude: { status: 'ok', data: { plan: 'Pro' } },
+      codex: { status: 'ok', data: { plan: 'Plus', session: {}, weekly: {} } },
+    }
+    setStorage(CACHE_KEY, cached)
+
+    globalThis.fetch = createFetchSequence([createResponse({ ok: false, status: 401 })])
+
+    const result = await state.serviceWorker.fetchAll(true, {
+      claude: true,
+      codex: true,
+      cursor: false,
+    })
+
+    expect(result.claude.status).toBe('logged_out')
+    expect(result.codex.status).toBe('logged_out')
+    expect(result.meta).toBeUndefined()
+  })
+
+  test('uses cached data for error providers but keeps logged_out', async () => {
+    const cached = {
+      timestamp: 123,
+      claude: { status: 'ok', data: { plan: 'Pro' } },
+      codex: { status: 'ok', data: { plan: 'Plus', session: {}, weekly: {} } },
+    }
+    setStorage(CACHE_KEY, cached)
+
+    globalThis.fetch = createFetchSequence([
+      createResponse({ ok: false, status: 401 }),
+      new Error('network down'),
+    ])
+
+    const result = await state.serviceWorker.fetchAll(true, {
+      claude: true,
+      codex: true,
+      cursor: false,
+    })
+
+    expect(result.claude.status).toBe('logged_out')
+    expect(result.codex).toEqual(cached.codex)
     expect(result.meta.cache).toBe(true)
     expect(result.meta.message).toBe(CACHE_FALLBACK_MESSAGE)
-    expect(result.claude).toEqual(cached.claude)
-    expect(getStorage(CACHE_KEY).timestamp).toBe(123)
   })
 
   test('caches results when providers succeed', async () => {
     setStorage(CACHE_KEY, {})
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session')
     globalThis.fetch = createFetchSequence([
       createResponse({ ok: true, status: 200, data: { accessToken: 'token' } }),
       createResponse({
@@ -332,25 +361,20 @@ describe('fetchAll cache behavior', () => {
   })
 
   test('normalizes rejected provider results', async () => {
-    const originalGet = state.chrome.cookies.get
-    state.chrome.cookies.get = async () => {
-      throw new Error('cookie fail')
+    globalThis.fetch = () => {
+      throw new Error('sync fail')
     }
 
-    try {
-      const result = await state.serviceWorker.fetchAll(true, {
-        claude: true,
-        codex: false,
-        cursor: false,
-      })
+    const result = await state.serviceWorker.fetchAll(true, {
+      claude: true,
+      codex: false,
+      cursor: false,
+    })
 
-      expect(result.claude).toEqual({
-        status: 'error',
-        message: FETCH_FALLBACK_MESSAGE,
-      })
-    } finally {
-      state.chrome.cookies.get = originalGet
-    }
+    expect(result.claude).toEqual({
+      status: 'error',
+      message: FETCH_FALLBACK_MESSAGE,
+    })
   })
 
   test('falls back to cache when fetchAll throws', async () => {

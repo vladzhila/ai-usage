@@ -25,11 +25,11 @@ Chrome extension that tracks usage limits across Claude, Codex, and Cursor in a 
 2. Click the extension icon in Chrome toolbar
 3. Your usage data appears automatically
 
-The extension reads your existing session cookies — no additional login required.
+The extension uses your existing browser sessions — no additional login required.
 
 ## How It Works
 
-The extension reads session cookies from each provider's domain, fetches usage data directly from their APIs, and caches results locally (60s TTL). If a fetch fails, cached data is shown with a staleness notice. No data leaves your browser.
+The extension fetches usage data directly from each provider's API using your existing browser sessions (`credentials: 'include'`), and caches results locally (60s TTL). On transient errors, cached data is shown with a staleness notice. No data leaves your browser.
 
 ## Installation
 

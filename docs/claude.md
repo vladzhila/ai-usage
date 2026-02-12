@@ -4,13 +4,7 @@ Claude provider fetches usage data from claude.ai Web API using browser session 
 
 ## Data Source
 
-Uses browser cookies (automatic via Chrome extension cookies API).
-
-**Cookie required:**
-
-- Name: `sessionKey`
-- Domain: `claude.ai`
-- Value prefix: `sk-ant-...`
+Uses browser session cookies sent automatically via `fetch()` with `credentials: 'include'`. No explicit cookie check is performed; authentication is validated by the API response status.
 
 ## API Endpoints
 
@@ -160,8 +154,7 @@ Shows additional spend beyond subscription limits.
 
 | Status       | Meaning                                      |
 | ------------ | -------------------------------------------- |
-| `logged_out` | No valid session cookie found                |
-| `expired`    | Session cookie expired (401/403)             |
+| `logged_out` | API returned 401/403 (not authenticated)     |
 | `error`      | API error, network error, or no organization |
 
 ## Key Files

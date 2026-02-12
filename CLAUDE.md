@@ -27,7 +27,7 @@ bun run format:check # Check formatting
 **Key Files**:
 
 - `src/background/service-worker.js` - Message listener, orchestrates fetches for all providers
-- `src/background/service-worker-core.js` - Shared fetch logic, cookie handling, caching, response parsing
+- `src/background/service-worker-core.js` - Shared fetch logic, caching, response parsing
 - `src/popup/popup.js` - UI logic, sends `FETCH_USAGE` messages to background
 - `src/lib/constants.js` - Time constants, usage thresholds
 - `src/lib/format.js` - Time formatting utilities
@@ -40,7 +40,7 @@ bun run format:check # Check formatting
 - Codex: `chatgpt.com/backend-api/wham/usage` (requires bearer token from session)
 - Cursor: `cursor.com/api/usage-summary` with legacy fallback to `/api/usage`
 
-**Caching**: Results cached 60s in `chrome.storage.local`. On fetch failure, returns cached data with staleness notice.
+**Caching**: Results cached 60s in `chrome.storage.local`. On transient errors, returns cached data with staleness notice. Definitive statuses (`logged_out`) are never replaced by cache.
 
 ## Development
 
@@ -58,7 +58,7 @@ bun run format:check # Check formatting
 
 Tests in `tests/` use `bun:test`. Chrome APIs mocked in `tests/mocks/chrome.js`.
 
-Mock helpers: `setCookie(url, name, value)`, `setStorage(key, value)`, `getStorage(key)`, `clearMocks()`
+Mock helpers: `setStorage(key, value)`, `getStorage(key)`, `clearMocks()`
 
 ## Pre-commit Hook
 

@@ -1,8 +1,6 @@
 // Service worker fetches usage and caches results.
 
 import {
-  getCookie,
-  isValid,
   getCache,
   setCache,
   isCacheValid,
@@ -22,19 +20,12 @@ const CURSOR_USER_URL = 'https://cursor.com/api/auth/me'
 const CURSOR_LEGACY_URL = 'https://cursor.com/api/usage'
 const CODEX_LOGIN_MESSAGE = 'Log into chatgpt.com to see usage'
 const CURSOR_LOGIN_MESSAGE = 'Log into cursor.com to see usage'
-const CODEX_TOKEN_MESSAGE = 'No access token in session'
 
 export async function fetchCodex() {
-  const cookie = await getCookie('chatgpt')
-
-  if (!isValid('chatgpt', cookie)) {
-    return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
-  }
-
   try {
     const session = await fetch(CHATGPT_SESSION_URL, { credentials: 'include' })
     if (session.status === 401 || session.status === 403) {
-      return { status: 'expired' }
+      return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
     }
 
     if (!session.ok) {
@@ -45,7 +36,7 @@ export async function fetchCodex() {
 
     const token = sessionData?.accessToken
     if (!token) {
-      return { status: 'expired', message: CODEX_TOKEN_MESSAGE }
+      return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
     }
 
     const usage = await fetch(CHATGPT_USAGE_URL, {
@@ -56,7 +47,7 @@ export async function fetchCodex() {
     })
 
     if (usage.status === 401 || usage.status === 403) {
-      return { status: 'expired' }
+      return { status: 'logged_out', message: CODEX_LOGIN_MESSAGE }
     }
 
     if (!usage.ok) {
@@ -93,12 +84,6 @@ export async function fetchCodex() {
 }
 
 export async function fetchCursorUsage() {
-  const cookie = await getCookie('cursor')
-
-  if (!isValid('cursor', cookie)) {
-    return { status: 'logged_out', message: CURSOR_LOGIN_MESSAGE }
-  }
-
   try {
     const [usage, user] = await Promise.all([
       fetch(CURSOR_USAGE_URL, { credentials: 'include' }),
@@ -106,7 +91,7 @@ export async function fetchCursorUsage() {
     ])
 
     if ([usage, user].some((response) => response.status === 401 || response.status === 403)) {
-      return { status: 'expired' }
+      return { status: 'logged_out', message: CURSOR_LOGIN_MESSAGE }
     }
 
     if (!usage.ok) {
@@ -194,8 +179,18 @@ export async function fetchAll(
     return result
   }
 
+  // Fall back to cache only for providers with transient errors.
+  // Definitive statuses (logged_out, expired) are kept as-is.
   if (cache) {
-    return buildResponse(visibility, cache, { cache: true, message: CACHE_FALLBACK_MESSAGE })
+    let usedCache = false
+    for (const p of providers) {
+      if (visibility[p] && result[p].status === 'error' && cache[p]) {
+        result[p] = cache[p]
+        usedCache = true
+      }
+    }
+    const meta = usedCache ? { cache: true, message: CACHE_FALLBACK_MESSAGE } : undefined
+    return buildResponse(visibility, result, meta)
   }
 
   return result

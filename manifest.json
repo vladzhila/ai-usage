@@ -3,7 +3,7 @@
   "name": "AI Usage",
   "version": "0.0.1",
   "description": "Track Claude, Codex, and Cursor usage limits in one place",
-  "permissions": ["storage", "cookies"],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://claude.ai/*",
     "https://chatgpt.com/*",

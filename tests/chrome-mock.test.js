@@ -46,21 +46,18 @@ describe('chrome mock storage', () => {
 })
 
 describe('chrome mock helpers', () => {
-  test('clearMocks removes storage and cookies', () => {
+  test('clearMocks removes storage', () => {
     setStorage('foo', 'bar')
     clearMocks()
     expect(getStorage('foo')).toBeUndefined()
   })
 
-  test('cookie and runtime helpers', async () => {
+  test('runtime and window helpers', async () => {
     const chrome = createChromeMock()
     const result = await chrome.runtime.sendMessage()
     expect(result).toEqual({})
 
     const windowResult = await chrome.windows.create()
     expect(windowResult.id).toBe(1)
-
-    const cookie = await chrome.cookies.get({ url: 'https://example.com', name: 'session' })
-    expect(cookie).toBeNull()
   })
 })

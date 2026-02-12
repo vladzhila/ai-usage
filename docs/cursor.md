@@ -4,13 +4,7 @@ Cursor provider fetches usage data from cursor.com Web API using browser session
 
 ## Data Source
 
-Uses browser cookies (automatic via Chrome extension cookies API).
-
-**Cookie required:**
-
-- Name: `WorkosCursorSessionToken`, `__Secure-next-auth.session-token`, or `next-auth.session-token`
-- Domain: `cursor.com` or `cursor.sh`
-- Value: any non-empty string
+Uses browser session cookies sent automatically via `fetch()` with `credentials: 'include'`. No explicit cookie check is performed; authentication is validated by the API response status.
 
 ## API Endpoints
 
@@ -169,8 +163,7 @@ Request-based usage for older Cursor plans.
 
 | Status       | Meaning                                              |
 | ------------ | ---------------------------------------------------- |
-| `logged_out` | No valid session cookie found                        |
-| `expired`    | Usage or user endpoint returned 401/403              |
+| `logged_out` | API returned 401/403 (not authenticated)             |
 | `error`      | API error, missing usage/user data, or network issue |
 
 ## Key Files

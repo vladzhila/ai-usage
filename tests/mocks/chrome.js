@@ -1,5 +1,4 @@
 const storage = new Map()
-const cookies = new Map()
 
 function getStorageResult(keys) {
   if (keys === null) {
@@ -22,7 +21,6 @@ function getStorageResult(keys) {
 
 export function createChromeMock() {
   storage.clear()
-  cookies.clear()
 
   return {
     storage: {
@@ -55,24 +53,16 @@ export function createChromeMock() {
         },
       },
     },
-    cookies: {
-      get: async ({ url, name }) => {
-        const key = `${url}:${name}`
-        const value = cookies.get(key)
-        return value ? { value } : null
-      },
-    },
     runtime: {
       sendMessage: async () => ({}),
+      onMessage: {
+        addListener: () => {},
+      },
     },
     windows: {
       create: async () => ({ id: 1 }),
     },
   }
-}
-
-export function setCookie(url, name, value) {
-  cookies.set(`${url}:${name}`, value)
 }
 
 export function setStorage(key, value) {
@@ -85,5 +75,4 @@ export function getStorage(key) {
 
 export function clearMocks() {
   storage.clear()
-  cookies.clear()
 }

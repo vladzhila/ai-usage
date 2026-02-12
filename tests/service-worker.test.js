@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test'
-import { createChromeMock, setCookie, clearMocks, setStorage, getStorage } from './mocks/chrome.js'
+import { createChromeMock, clearMocks, getStorage } from './mocks/chrome.js'
 
 const chrome = createChromeMock()
 globalThis.chrome = chrome
@@ -10,12 +10,9 @@ const mockFetch = mock(() =>
 globalThis.fetch = mockFetch
 
 import {
-  SERVICES,
   CACHE_KEY,
   CACHE_TTL,
   FETCH_ERROR_MESSAGE,
-  getCookie,
-  isValid,
   fetchJson,
   getCache,
   setCache,
@@ -26,105 +23,9 @@ import {
   parseLegacyCursor,
 } from '../src/background/service-worker-core.js'
 
-describe('SERVICES config', () => {
-  test('has claude config', () => {
-    expect(SERVICES.claude).toBeDefined()
-    expect(SERVICES.claude.urls).toContain('https://claude.ai')
-    expect(SERVICES.claude.cookies).toContain('sessionKey')
-    expect(SERVICES.claude.prefix).toBe('sk-ant-')
-  })
-
-  test('has chatgpt config', () => {
-    expect(SERVICES.chatgpt).toBeDefined()
-    expect(SERVICES.chatgpt.urls).toContain('https://chatgpt.com')
-    expect(SERVICES.chatgpt.cookies).toContain('__Secure-next-auth.session-token')
-    expect(SERVICES.chatgpt.cookies).toContain('next-auth.session-token')
-    expect(SERVICES.chatgpt.prefix).toBeNull()
-  })
-
-  test('has cursor config', () => {
-    expect(SERVICES.cursor).toBeDefined()
-    expect(SERVICES.cursor.urls).toContain('https://cursor.com')
-    expect(SERVICES.cursor.urls).toContain('https://cursor.sh')
-    expect(SERVICES.cursor.cookies).toContain('WorkosCursorSessionToken')
-    expect(SERVICES.cursor.cookies).toContain('__Secure-next-auth.session-token')
-    expect(SERVICES.cursor.cookies).toContain('next-auth.session-token')
-    expect(SERVICES.cursor.prefix).toBeNull()
-  })
-})
-
 describe('formatCodexPlan', () => {
   test('falls back to Free when type is empty', () => {
     expect(formatCodexPlan('   ')).toBe('Free')
-  })
-})
-
-describe('getCookie', () => {
-  beforeEach(() => {
-    clearMocks()
-  })
-
-  test('returns null for unknown service', async () => {
-    const result = await getCookie('unknown')
-    expect(result).toBeNull()
-  })
-
-  test('returns null when no cookie', async () => {
-    const result = await getCookie('claude')
-    expect(result).toBeNull()
-  })
-
-  test('returns cookie value for claude', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-test')
-    const result = await getCookie('claude')
-    expect(result).toBe('sk-ant-test')
-  })
-
-  test('returns cookie value for chatgpt', async () => {
-    setCookie('https://chatgpt.com', '__Secure-next-auth.session-token', 'session-123')
-    const result = await getCookie('chatgpt')
-    expect(result).toBe('session-123')
-  })
-
-  test('falls back to alternate chatgpt cookie', async () => {
-    setCookie('https://chatgpt.com', 'next-auth.session-token', 'session-456')
-    const result = await getCookie('chatgpt')
-    expect(result).toBe('session-456')
-  })
-
-  test('returns cookie value for cursor', async () => {
-    setCookie('https://cursor.com', 'WorkosCursorSessionToken', 'cursor-session')
-    const result = await getCookie('cursor')
-    expect(result).toBe('cursor-session')
-  })
-
-  test('falls back to cursor alternate cookie and domain', async () => {
-    setCookie('https://cursor.sh', '__Secure-next-auth.session-token', 'cursor-alt')
-    const result = await getCookie('cursor')
-    expect(result).toBe('cursor-alt')
-  })
-})
-
-describe('isValid', () => {
-  test('returns false for null/undefined', () => {
-    expect(isValid('claude', null)).toBe(false)
-    expect(isValid('claude', undefined)).toBe(false)
-    expect(isValid('chatgpt', null)).toBe(false)
-  })
-
-  test('validates claude cookie prefix', () => {
-    expect(isValid('claude', 'sk-ant-valid-token')).toBe(true)
-    expect(isValid('claude', 'invalid-token')).toBe(false)
-  })
-
-  test('accepts any non-empty chatgpt cookie', () => {
-    expect(isValid('chatgpt', 'any-value')).toBe(true)
-    expect(isValid('chatgpt', 'x')).toBe(true)
-  })
-
-  test('accepts any non-empty cursor cookie', () => {
-    expect(isValid('cursor', 'cursor-session')).toBe(true)
-    expect(isValid('cursor', 'x')).toBe(true)
   })
 })
 
@@ -227,7 +128,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns usage error when usage fetch fails', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-test')
     mockFetch.mockImplementation((url) => {
       if (url.endsWith('/api/organizations')) {
         return Promise.resolve({
@@ -253,8 +153,33 @@ describe('fetchClaude', () => {
     expect(result.message).toBe('HTTP 500')
   })
 
+  test('returns logged_out when usage endpoint is unauthorized', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([{ uuid: 'org-1' }]),
+        })
+      }
+      if (url.endsWith('/usage')) {
+        return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({}) })
+      }
+      if (url.endsWith('/overage_spend_limit')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      if (url.endsWith('/api/account')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('logged_out')
+    expect(result.message).toContain('Log into claude.ai')
+  })
+
   test('detects Ultra plan from rate_limit_tier', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-test')
     mockFetch.mockImplementation((url) => {
       if (url.endsWith('/api/organizations')) {
         return Promise.resolve({
@@ -367,14 +292,14 @@ describe('fetchClaude', () => {
     mockFetch.mockClear()
   })
 
-  test('returns logged_out when no valid cookie', async () => {
+  test('returns logged_out when orgs request is unauthorized', async () => {
+    mockFetch.mockImplementation(() => Promise.resolve({ ok: false, status: 403 }))
     const result = await fetchClaude()
     expect(result.status).toBe('logged_out')
     expect(result.message).toContain('Log into claude.ai')
   })
 
   test('returns error when fetch fails', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
     mockFetch.mockImplementation(() => Promise.reject(new Error('Network error')))
     const result = await fetchClaude()
     expect(result.status).toBe('error')
@@ -382,7 +307,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns error when no organization found', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
     mockFetch.mockImplementation(() =>
       Promise.resolve({
         ok: true,
@@ -397,8 +321,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Pro plan with session-only data', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_pro' },
@@ -420,8 +342,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Max plan with opus and sonnet windows and extra spend', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_max' },
@@ -452,8 +372,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Free plan with session-only data', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', capabilities: [] },
@@ -472,8 +390,6 @@ describe('fetchClaude', () => {
   })
 
   test('gracefully handles overage endpoint failure', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_pro' },
@@ -490,8 +406,6 @@ describe('fetchClaude', () => {
   })
 
   test('gracefully handles account endpoint failure', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', capabilities: ['claude_pro'] },
@@ -507,8 +421,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Team plan from rate_limit_tier', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_team', billing_type: null },
@@ -522,8 +434,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Ultra plan from rate_limit_tier', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_ultra', billing_type: null },
@@ -538,8 +448,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Pro plan when billing_type indicates paid', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { billing_type: 'stripe', rate_limit_tier: null },
@@ -554,8 +462,6 @@ describe('fetchClaude', () => {
   })
 
   test('does not use billing_type when tier is present', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { billing_type: 'stripe', rate_limit_tier: 'claude_team' },
@@ -569,8 +475,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns Enterprise plan from rate_limit_tier', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_enterprise', billing_type: null },
@@ -584,8 +488,6 @@ describe('fetchClaude', () => {
   })
 
   test('detects Max plan from org rate_limit_tier containing max', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', rate_limit_tier: 'default_claude_max_5x', capabilities: [] },
@@ -604,8 +506,6 @@ describe('fetchClaude', () => {
   })
 
   test('detects Max plan from org rate_limit_tier with 20x suffix', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', rate_limit_tier: 'default_claude_max_20x', capabilities: [] },
@@ -623,8 +523,6 @@ describe('fetchClaude', () => {
   })
 
   test('detects Max plan from capabilities when tier missing', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', capabilities: ['chat', 'claude_max'] },
@@ -639,8 +537,6 @@ describe('fetchClaude', () => {
   })
 
   test('detects Ultra plan from capabilities when tier missing', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         org: { uuid: 'org-123', capabilities: ['chat', 'claude_ultra'] },
@@ -659,8 +555,6 @@ describe('fetchClaude', () => {
   })
 
   test('returns extra disabled when is_enabled false', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_max' },
@@ -675,8 +569,6 @@ describe('fetchClaude', () => {
   })
 
   test('handles null fiveHour window gracefully', async () => {
-    setCookie('https://claude.ai', 'sessionKey', 'sk-ant-valid')
-
     mockFetch.mockImplementation(
       createClaudeMock({
         account: { rate_limit_tier: 'claude_pro' },

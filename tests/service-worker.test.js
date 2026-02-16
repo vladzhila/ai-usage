@@ -142,6 +142,9 @@ describe('fetchClaude', () => {
       if (url.endsWith('/overage_spend_limit')) {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
       }
+      if (url.endsWith('/overage_credit_grant')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
       if (url.endsWith('/api/account')) {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
       }
@@ -166,6 +169,9 @@ describe('fetchClaude', () => {
         return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({}) })
       }
       if (url.endsWith('/overage_spend_limit')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      if (url.endsWith('/overage_credit_grant')) {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
       }
       if (url.endsWith('/api/account')) {
@@ -209,6 +215,9 @@ describe('fetchClaude', () => {
             Promise.resolve({ is_enabled: true, used_credits: 100, monthly_credit_limit: 200 }),
         })
       }
+      if (url.endsWith('/overage_credit_grant')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
       if (url.endsWith('/api/account')) {
         return Promise.resolve({
           ok: true,
@@ -243,8 +252,10 @@ function createClaudeMock(options = {}) {
     usage = { five_hour: { utilization: 45, resets_at: '2025-01-01T00:00:00Z' } },
     account = { rate_limit_tier: 'claude_pro', billing_type: null },
     overage = { is_enabled: false },
+    creditGrant = {},
     accountFails = false,
     overageFails = false,
+    creditGrantFails = false,
   } = options
 
   return (url) => {
@@ -270,6 +281,16 @@ function createClaudeMock(options = {}) {
         ok: true,
         status: 200,
         json: () => Promise.resolve(account),
+      })
+    }
+    if (url.includes('/overage_credit_grant')) {
+      if (creditGrantFails) {
+        return Promise.resolve({ ok: false, status: 500 })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(creditGrant),
       })
     }
     if (url.includes('/overage')) {
@@ -369,6 +390,8 @@ describe('fetchClaude', () => {
     expect(result.data.extra.enabled).toBe(true)
     expect(result.data.extra.used).toBe(5.5)
     expect(result.data.extra.limit).toBe(20)
+    expect(result.data.extra.percent).toBe(28)
+    expect(result.data.extra.balance).toBeNull()
   })
 
   test('returns Free plan with session-only data', async () => {
@@ -625,6 +648,183 @@ describe('fetchClaude', () => {
     expect(result.data.extra.enabled).toBe(true)
     expect(result.data.extra.used).toBe(3)
     expect(result.data.extra.limit).toBe(10)
+    expect(result.data.extra.percent).toBe(30)
+    expect(result.data.extra.balance).toBeNull()
+  })
+
+  test('returns extra with balance from credit grant', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 1716,
+          monthly_credit_limit: 5000,
+        },
+        creditGrant: {
+          available: true,
+          eligible: true,
+          granted: true,
+          amount_minor_units: 5000,
+          currency: 'USD',
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.enabled).toBe(true)
+    expect(result.data.extra.used).toBe(17.16)
+    expect(result.data.extra.limit).toBe(50)
+    expect(result.data.extra.percent).toBe(34)
+    expect(result.data.extra.balance).toBeCloseTo(32.84)
+  })
+
+  test('returns extra balance null when grant not granted', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 500,
+          monthly_credit_limit: 2000,
+        },
+        creditGrant: {
+          available: false,
+          eligible: false,
+          granted: false,
+          amount_minor_units: 0,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.enabled).toBe(true)
+    expect(result.data.extra.balance).toBeNull()
+  })
+
+  test('returns extra with correct percentage', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: { five_hour: { utilization: 10 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 750,
+          monthly_credit_limit: 1000,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.percent).toBe(75)
+  })
+
+  test('returns extra percent zero when limit is zero', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: { five_hour: { utilization: 10 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 100,
+          monthly_credit_limit: 0,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.percent).toBe(0)
+  })
+
+  test('clamps extra percent to 100 when used exceeds limit', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: { five_hour: { utilization: 10 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 1500,
+          monthly_credit_limit: 1000,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.percent).toBe(100)
+  })
+
+  test('clamps extra balance to zero when used exceeds grant', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 6000,
+          monthly_credit_limit: 5000,
+        },
+        creditGrant: {
+          available: true,
+          eligible: true,
+          granted: true,
+          amount_minor_units: 5000,
+          currency: 'USD',
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.balance).toBe(0)
+  })
+
+  test('returns balance null when overage disabled even with credit grant', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: { is_enabled: false },
+        creditGrant: {
+          available: true,
+          eligible: true,
+          granted: true,
+          amount_minor_units: 5000,
+          currency: 'USD',
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.enabled).toBe(false)
+    expect(result.data.extra.balance).toBeNull()
+  })
+
+  test('returns balance null when credit grant endpoint fails', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_max' },
+        usage: { five_hour: { utilization: 20 } },
+        overage: {
+          is_enabled: true,
+          used_credits: 500,
+          monthly_credit_limit: 2000,
+        },
+        creditGrantFails: true,
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.extra.enabled).toBe(true)
+    expect(result.data.extra.balance).toBeNull()
   })
 })
 

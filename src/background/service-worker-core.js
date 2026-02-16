@@ -108,13 +108,15 @@ function parseWindow(window) {
 }
 
 // Converts cents-based fields to dollars.
-function parseOverage(data) {
+function parseOverage(data, grantData) {
   const enabled = Boolean(data?.is_enabled)
-  return {
-    enabled,
-    used: enabled ? (data.used_credits || 0) / CENTS_PER_DOLLAR : 0,
-    limit: enabled ? (data.monthly_credit_limit || 0) / CENTS_PER_DOLLAR : 0,
-  }
+  const used = enabled ? (data.used_credits || 0) / CENTS_PER_DOLLAR : 0
+  const limit = enabled ? (data.monthly_credit_limit || 0) / CENTS_PER_DOLLAR : 0
+  const percent = limit > 0 ? Math.min(PERCENT_MAX, Math.round((used / limit) * PERCENT_MAX)) : 0
+  const grantAmount =
+    enabled && grantData?.granted ? (grantData.amount_minor_units || 0) / CENTS_PER_DOLLAR : null
+  const balance = grantAmount !== null ? Math.max(0, grantAmount - used) : null
+  return { enabled, used, limit, percent, balance }
 }
 
 // Heuristics for Claude plan when tier is missing.
@@ -168,10 +170,11 @@ export async function fetchClaude() {
 
   const baseUrl = `https://claude.ai/api/organizations/${org.uuid}`
 
-  const [usage, overage, account] = await Promise.all([
+  const [usage, overage, account, creditGrant] = await Promise.all([
     fetchJson(`${baseUrl}/usage`),
     fetchJson(`${baseUrl}/overage_spend_limit`),
     fetchJson('https://claude.ai/api/account'),
+    fetchJson(`${baseUrl}/overage_credit_grant`),
   ])
 
   if (usage.status === 'expired') {
@@ -193,7 +196,7 @@ export async function fetchClaude() {
       weekly: parseWindow(windows.seven_day),
       opus: hasModelWindows ? parseWindow(windows.seven_day_opus) : null,
       sonnet: hasModelWindows ? parseWindow(windows.seven_day_sonnet) : null,
-      extra: parseOverage(overage.data),
+      extra: parseOverage(overage.data, creditGrant.data),
     },
   }
 }

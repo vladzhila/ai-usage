@@ -165,13 +165,24 @@
               </div>
             </div>
             <div class="section" data-section="extra" style="display: none">
+              <div class="section-head">EXTRA USAGE</div>
               <div class="row">
-                <span class="label">EXTRA</span>
+                <span class="label">SPENT</span>
                 <span class="value"
-                  >$<span data-field="extra-used">0</span> / $<span data-field="extra-limit"
-                    >0</span
-                  ></span
-                >
+                  >$<span data-field="extra-used">0</span
+                  ><span class="muted pct" data-field="extra-percent"></span
+                ></span>
+              </div>
+              <div class="progress">
+                <div class="bar" data-field="extra-bar" style="width: 0%"></div>
+              </div>
+              <div class="row">
+                <span class="label">LIMIT</span>
+                <span class="value">$<span data-field="extra-limit">0</span>/mo</span>
+              </div>
+              <div class="row" data-row="extra-balance" style="display: none">
+                <span class="label">BALANCE</span>
+                <span class="value">$<span data-field="extra-balance">0</span></span>
               </div>
             </div>
           </div>

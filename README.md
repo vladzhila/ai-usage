@@ -9,7 +9,7 @@ Chrome extension that tracks usage limits across Claude, Codex, and Cursor in a 
 - **Unified dashboard** — View all AI service limits in one place
 - **Visual progress bars** — Color-coded thresholds (warning at 50%, danger at 80%)
 - **Reset countdowns** — See when your limits refresh
-- **Provider details** — Claude overage spend, Codex credits, Cursor on-demand spend and legacy request counts
+- **Provider details** — Claude extra usage (spent, limit, balance), Codex credits, Cursor on-demand spend and legacy request counts
 - **Customizable** — Reorder providers, toggle visibility, dark/light theme
 - **Privacy-focused** — No external servers, data stays in your browser
 

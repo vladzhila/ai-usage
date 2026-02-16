@@ -8,12 +8,13 @@ Uses browser session cookies sent automatically via `fetch()` with `credentials:
 
 ## API Endpoints
 
-| Endpoint                                          | Returns                                                                |
-| ------------------------------------------------- | ---------------------------------------------------------------------- |
-| `GET /api/organizations`                          | Organization UUID (first organization is used)                         |
-| `GET /api/organizations/{id}/usage`               | `five_hour`, `seven_day`, `seven_day_opus`, `seven_day_sonnet` windows |
-| `GET /api/organizations/{id}/overage_spend_limit` | Extra usage: `is_enabled`, `used_credits`, `monthly_credit_limit`      |
-| `GET /api/account`                                | `rate_limit_tier`, `billing_type` for plan detection                   |
+| Endpoint                                           | Returns                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------- |
+| `GET /api/organizations`                           | Organization UUID (first organization is used)                         |
+| `GET /api/organizations/{id}/usage`                | `five_hour`, `seven_day`, `seven_day_opus`, `seven_day_sonnet` windows |
+| `GET /api/organizations/{id}/overage_spend_limit`  | Extra usage: `is_enabled`, `used_credits`, `monthly_credit_limit`      |
+| `GET /api/organizations/{id}/overage_credit_grant` | Credit grant: `granted`, `amount_minor_units`, `currency`              |
+| `GET /api/account`                                 | `rate_limit_tier`, `billing_type` for plan detection                   |
 
 ## Plan Detection
 
@@ -73,6 +74,8 @@ Shows additional spend beyond subscription limits.
 - Only displayed when `is_enabled: true`
 - Values in cents, converted to dollars for display
 - Fields: `used_credits`, `monthly_credit_limit`
+- Percentage: `Math.round(used / limit * 100)`, clamped to 100, 0 when limit is 0
+- Balance from `/overage_credit_grant`: `amount_minor_units / 100 - used`, clamped to 0, null when not granted
 - When the overage endpoint fails or is disabled, `enabled: false` and values are zeroed
 
 ## Data Structure
@@ -86,7 +89,7 @@ Shows additional spend beyond subscription limits.
     weekly: { used: 30, reset: 'ISO-timestamp' },    // null when API omits seven_day
     opus: { used: 20, reset: 'ISO-timestamp' },      // Max/Ultra only, null otherwise (not displayed)
     sonnet: { used: 10, reset: 'ISO-timestamp' },    // Max/Ultra only, null otherwise
-    extra: { enabled: true, used: 5.50, limit: 20.00 }
+    extra: { enabled: true, used: 5.50, limit: 20.00, percent: 28, balance: 44.50 }
   }
 }
 ```
@@ -127,6 +130,18 @@ Shows additional spend beyond subscription limits.
 }
 ```
 
+`GET /api/organizations/{id}/overage_credit_grant`
+
+```js
+{
+  available: true,
+  eligible: true,
+  granted: true,
+  amount_minor_units: 5000,
+  currency: 'USD',
+}
+```
+
 `GET /api/account`
 
 ```js
@@ -148,6 +163,8 @@ Shows additional spend beyond subscription limits.
 - `overage_spend_limit.is_enabled` -> `data.extra.enabled`
 - `overage_spend_limit.used_credits` -> `data.extra.used` (cents to dollars)
 - `overage_spend_limit.monthly_credit_limit` -> `data.extra.limit` (cents to dollars)
+- `used / limit * 100` -> `data.extra.percent` (0 when limit is 0)
+- `overage_credit_grant.granted` + `overage_credit_grant.amount_minor_units` - `overage_spend_limit.used_credits` -> `data.extra.balance` (all cents to dollars, clamped to 0, null when not granted)
 - `org.rate_limit_tier` || `account.rate_limit_tier` + `account.billing_type` + `org.capabilities` -> `data.plan`
 
 ## Error States

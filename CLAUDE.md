@@ -36,7 +36,7 @@ bun run format:check # Check formatting
 
 **Provider APIs**:
 
-- Claude: `claude.ai/api/organizations/{uuid}/usage` + `/overage_spend_limit`
+- Claude: `claude.ai/api/organizations/{uuid}/usage` + `/overage_spend_limit` + `/overage_credit_grant`
 - Codex: `chatgpt.com/backend-api/wham/usage` (requires bearer token from session)
 - Cursor: `cursor.com/api/usage-summary` with legacy fallback to `/api/usage`
 

@@ -473,3 +473,18 @@ body.dark .theme-toggle .moon {
 .empty.hidden {
   display: none;
 }
+
+.section-head {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--label);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  padding-top: 4px;
+}
+
+.pct {
+  margin-left: 6px;
+}

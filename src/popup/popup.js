@@ -271,8 +271,21 @@ function updateClaudeCard(card, data) {
   if (!extra.enabled) {
     return
   }
+  const percent = extra.percent ?? 0
+  const balance = extra.balance ?? null
+
   setField(card, 'extra-used', formatDollars(extra.used))
+  setField(card, 'extra-percent', `${percent}%`)
+  updateBar(card, 'extra-bar', percent)
   setField(card, 'extra-limit', formatDollars(extra.limit))
+
+  const balanceRow = card.querySelector('[data-row="extra-balance"]')
+  if (balanceRow) {
+    balanceRow.style.display = balance !== null ? '' : 'none'
+  }
+  if (balance !== null) {
+    setField(card, 'extra-balance', formatDollars(balance))
+  }
 }
 
 function updateCodexCard(card, data) {

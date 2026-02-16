@@ -101,8 +101,14 @@ const POPUP_BODY_HTML = `
       <div class="row" data-row="sonnet-reset"><div data-field="sonnet-reset"></div></div>
     </div>
     <div data-section="extra">
+      <div class="section-head">EXTRA USAGE</div>
       <div data-field="extra-used"></div>
+      <div class="muted pct" data-field="extra-percent"></div>
+      <div data-field="extra-bar"></div>
       <div data-field="extra-limit"></div>
+      <div class="row" data-row="extra-balance">
+        <div data-field="extra-balance"></div>
+      </div>
     </div>
   </div>
   <div data-service="codex">
@@ -233,7 +239,7 @@ function buildClaudeResult(data) {
       weekly: null,
       opus: null,
       sonnet: null,
-      extra: { enabled: false, used: 0, limit: 0 },
+      extra: { enabled: false, used: 0, limit: 0, percent: 0, balance: null },
       ...data,
     },
   }
@@ -530,7 +536,7 @@ describe('Popup - DOM updates', () => {
             weekly: null,
             opus: null,
             sonnet: null,
-            extra: { enabled: true, used: 12.3, limit: 45.6 },
+            extra: { enabled: true, used: 12.3, limit: 45.6, percent: 27, balance: null },
           },
         },
       }),
@@ -538,11 +544,65 @@ describe('Popup - DOM updates', () => {
 
     const extraSection = doc.querySelector('[data-service="claude"] [data-section="extra"]')
     const extraUsed = doc.querySelector('[data-service="claude"] [data-field="extra-used"]')
+    const extraPercent = doc.querySelector('[data-service="claude"] [data-field="extra-percent"]')
+    const extraBar = doc.querySelector('[data-service="claude"] [data-field="extra-bar"]')
     const extraLimit = doc.querySelector('[data-service="claude"] [data-field="extra-limit"]')
+    const balanceRow = doc.querySelector('[data-service="claude"] [data-row="extra-balance"]')
 
     expect(extraSection.style.display).toBe('block')
     expect(extraUsed.textContent).toBe('12.30')
+    expect(extraPercent.textContent).toBe('27%')
+    expect(extraBar.style.width).toBe('27%')
     expect(extraLimit.textContent).toBe('45.60')
+    expect(balanceRow.style.display).toBe('none')
+  })
+
+  test('renders extra balance when credit grant available', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          extra: { enabled: true, used: 17.16, limit: 50, percent: 34, balance: 32.83 },
+        }),
+      }),
+    })
+
+    const balanceRow = doc.querySelector('[data-service="claude"] [data-row="extra-balance"]')
+    const balanceField = doc.querySelector('[data-service="claude"] [data-field="extra-balance"]')
+
+    expect(balanceRow.style.display).toBe('')
+    expect(balanceField.textContent).toBe('32.83')
+  })
+
+  test('hides extra balance row when no credit grant', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          extra: { enabled: true, used: 5, limit: 20, percent: 25, balance: null },
+        }),
+      }),
+    })
+
+    const balanceRow = doc.querySelector('[data-service="claude"] [data-row="extra-balance"]')
+    expect(balanceRow.style.display).toBe('none')
+  })
+
+  test('handles stale cache missing percent and balance fields', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          extra: { enabled: true, used: 5, limit: 20 },
+        }),
+      }),
+    })
+
+    const percentField = doc.querySelector('[data-service="claude"] [data-field="extra-percent"]')
+    const balanceRow = doc.querySelector('[data-service="claude"] [data-row="extra-balance"]')
+
+    expect(percentField.textContent).toBe('0%')
+    expect(balanceRow.style.display).toBe('none')
   })
 
   test('renders Cursor on-demand and legacy details', async () => {

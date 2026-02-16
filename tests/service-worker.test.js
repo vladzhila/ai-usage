@@ -580,6 +580,52 @@ describe('fetchClaude', () => {
     expect(result.status).toBe('ok')
     expect(result.data.fiveHour).toBeNull()
   })
+
+  test('returns Pro plan with weekly data', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: {
+          five_hour: { utilization: 30, resets_at: '2025-01-01T05:00:00Z' },
+          seven_day: { utilization: 50, resets_at: '2025-01-08T00:00:00Z' },
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro')
+    expect(result.data.fiveHour.used).toBe(30)
+    expect(result.data.weekly.used).toBe(50)
+    expect(result.data.weekly.reset).toBe('2025-01-08T00:00:00Z')
+    expect(result.data.opus).toBeNull()
+    expect(result.data.sonnet).toBeNull()
+  })
+
+  test('returns Pro plan with extra usage', async () => {
+    mockFetch.mockImplementation(
+      createClaudeMock({
+        account: { rate_limit_tier: 'claude_pro' },
+        usage: {
+          five_hour: { utilization: 25, resets_at: '2025-01-01T05:00:00Z' },
+          seven_day: { utilization: 60, resets_at: '2025-01-08T00:00:00Z' },
+        },
+        overage: {
+          is_enabled: true,
+          used_credits: 300,
+          monthly_credit_limit: 1000,
+        },
+      })
+    )
+
+    const result = await fetchClaude()
+    expect(result.status).toBe('ok')
+    expect(result.data.plan).toBe('Pro')
+    expect(result.data.weekly.used).toBe(60)
+    expect(result.data.extra.enabled).toBe(true)
+    expect(result.data.extra.used).toBe(3)
+    expect(result.data.extra.limit).toBe(10)
+  })
 })
 
 const CURSOR_USAGE_RESPONSE = {

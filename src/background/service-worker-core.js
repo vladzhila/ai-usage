@@ -182,7 +182,7 @@ export async function fetchClaude() {
   }
 
   const plan = detectPlan(account.data, org)
-  const isMaxOrUltra = plan === 'Max' || plan === 'Ultra'
+  const hasModelWindows = plan === 'Max' || plan === 'Ultra'
   const windows = usage.data || {}
 
   return {
@@ -190,9 +190,9 @@ export async function fetchClaude() {
     data: {
       plan,
       fiveHour: parseWindow(windows.five_hour),
-      weekly: isMaxOrUltra ? parseWindow(windows.seven_day) : null,
-      opus: isMaxOrUltra ? parseWindow(windows.seven_day_opus) : null,
-      sonnet: isMaxOrUltra ? parseWindow(windows.seven_day_sonnet) : null,
+      weekly: parseWindow(windows.seven_day),
+      opus: hasModelWindows ? parseWindow(windows.seven_day_opus) : null,
+      sonnet: hasModelWindows ? parseWindow(windows.seven_day_sonnet) : null,
       extra: parseOverage(overage.data),
     },
   }

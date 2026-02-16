@@ -48,7 +48,7 @@ Heuristics (in order):
 
 ### Weekly (7-day)
 
-- **Only Max and Ultra plans** (null otherwise)
+- Available for any plan whose API response includes `seven_day` (null otherwise)
 - Field: `seven_day.utilization` (0-100%)
 - Reset: `seven_day.resets_at` (ISO timestamp)
 
@@ -83,7 +83,7 @@ Shows additional spend beyond subscription limits.
   data: {
     plan: 'Max' | 'Pro' | 'Team' | 'Enterprise' | 'Ultra' | 'Free',
     fiveHour: { used: 45, reset: 'ISO-timestamp' },
-    weekly: { used: 30, reset: 'ISO-timestamp' },    // Max/Ultra only, null otherwise
+    weekly: { used: 30, reset: 'ISO-timestamp' },    // null when API omits seven_day
     opus: { used: 20, reset: 'ISO-timestamp' },      // Max/Ultra only, null otherwise (not displayed)
     sonnet: { used: 10, reset: 'ISO-timestamp' },    // Max/Ultra only, null otherwise
     extra: { enabled: true, used: 5.50, limit: 20.00 }
@@ -142,7 +142,7 @@ Shows additional spend beyond subscription limits.
 - `organizations[0].rate_limit_tier` -> primary plan detection (e.g., `default_claude_max_5x`)
 - `organizations[0].capabilities` -> fallback plan detection (`claude_max`, `claude_ultra`, `claude_pro`)
 - `usage.five_hour` -> `data.fiveHour`
-- `usage.seven_day` -> `data.weekly` (Max/Ultra only)
+- `usage.seven_day` -> `data.weekly` (null when API omits the field)
 - `usage.seven_day_opus` -> `data.opus` (Max/Ultra only, not displayed)
 - `usage.seven_day_sonnet` -> `data.sonnet` (Max/Ultra only)
 - `overage_spend_limit.is_enabled` -> `data.extra.enabled`

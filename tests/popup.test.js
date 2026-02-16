@@ -780,6 +780,25 @@ describe('Popup - DOM updates', () => {
     expect(sonnetSection.style.display).toBe('block')
   })
 
+  test('renders Pro card with weekly section', async () => {
+    const doc = await setupPopup({
+      storage: { showClaude: true, showCodex: false, showCursor: false },
+      result: buildResult({
+        claude: buildClaudeResult({
+          plan: 'Pro',
+          weekly: { used: 65, reset: Date.now() + 3 * 24 * 60 * 60 * 1000 },
+        }),
+      }),
+    })
+
+    const weeklySection = doc.querySelector('[data-service="claude"] [data-section="weekly"]')
+    const weeklyUsed = doc.querySelector('[data-service="claude"] [data-field="weekly-used"]')
+    const weeklyBar = doc.querySelector('[data-service="claude"] [data-field="weekly-bar"]')
+    expect(weeklySection.style.display).toBe('block')
+    expect(weeklyUsed.textContent).toBe('65')
+    expect(weeklyBar.style.width).toBe('65%')
+  })
+
   test('hides Codex credits section when no credits', async () => {
     const doc = await setupPopup({
       storage: { showClaude: false, showCodex: true, showCursor: false },

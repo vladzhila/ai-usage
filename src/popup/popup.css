@@ -61,7 +61,7 @@ body::-webkit-scrollbar {
 
 .container {
   position: relative;
-  padding: 0 10px 10px;
+  padding: 0 8px 8px;
 }
 
 .header {
@@ -72,9 +72,9 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  margin-bottom: 6px;
+  padding-top: 6px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -254,14 +254,14 @@ body.dark .theme-toggle .moon {
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   box-shadow: var(--card-shadow);
 }
 
@@ -269,7 +269,7 @@ body.dark .theme-toggle .moon {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .name {
@@ -331,7 +331,7 @@ body.dark .theme-toggle .moon {
 }
 
 .card-body {
-  min-height: 40px;
+  min-height: 32px;
 }
 
 .loader {
@@ -371,7 +371,7 @@ body.dark .theme-toggle .moon {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .label {
@@ -393,8 +393,8 @@ body.dark .theme-toggle .moon {
 }
 
 .row-sub {
-  margin-bottom: 6px;
-  padding-bottom: 4px;
+  margin-bottom: 4px;
+  padding-bottom: 3px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -416,7 +416,7 @@ body.dark .theme-toggle .moon {
   background: var(--border);
   border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .bar {
@@ -481,8 +481,8 @@ body.dark .theme-toggle .moon {
   letter-spacing: 0.08em;
   color: var(--label);
   text-transform: uppercase;
-  margin-bottom: 4px;
-  padding-top: 4px;
+  margin-bottom: 3px;
+  padding-top: 3px;
 }
 
 .pct {
